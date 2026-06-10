@@ -79,23 +79,92 @@ service cloud.firestore {
     // GROUP CHALLENGES (Multiplayer 2-10 people)
     // ============================================================
     
-    match /challengeGroups/{groupId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      // This helps diagnose permission issues
-      allow create, read, update, delete: if request.auth != null;
+    // Group hardening (mirrors the competitions pattern). Reads stay open —
+    // the invite-code lookup runs before membership, and teammates render each
+    // other's docs, so query rules can't be membership-scoped. Updates stay
+    // open to any signed-in user because joins and progress syncs are
+    // whole-roster transactional rewrites from clients (accepted residual
+    // risk, same as competitions), but the group's identity and economic
+    // template are pinned and deletion is restricted.
+    function isGroupCreatorOrSoleParticipant(data) {
+      return request.auth.uid == data.createdBy
+        || (data.participants.size() == 1 && data.participants[0].id == request.auth.uid);
     }
-    
-    // Group progress tracking
+    function parentGroupData(groupId) {
+      return get(/databases/$(database)/documents/challengeGroups/$(groupId)).data;
+    }
+
+    match /challengeGroups/{groupId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.startDate is timestamp
+        && request.resource.data.endDate is timestamp
+        && request.resource.data.stakeAmount is number
+        && request.resource.data.stakeAmount >= 0;
+
+      // Live client writes (join, roster sync, workout counter) only touch
+      // participants/totalMoneyStaked/totalWorkoutsCompleted, so these pins
+      // cost nothing legitimate. isActive is server-owned (daily cleanup via
+      // Admin SDK); pinning it stops clients resurrecting or hiding groups.
+      // Timestamps compared at 1s tolerance: iOS round-trips
+      // Timestamp → Date → Timestamp, which can drift by microseconds.
+      allow update: if request.auth != null
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.inviteCode == resource.data.inviteCode
+        && request.resource.data.isActive == resource.data.isActive
+        && math.abs(request.resource.data.startDate.toMillis() - resource.data.startDate.toMillis()) < 1000
+        && math.abs(request.resource.data.endDate.toMillis() - resource.data.endDate.toMillis()) < 1000
+        && request.resource.data.stakeAmount == resource.data.stakeAmount
+        && request.resource.data.get('mode', '') == resource.data.get('mode', '')
+        && request.resource.data.get('durationDays', 0) == resource.data.get('durationDays', 0)
+        && request.resource.data.get('startCalendarDateKey', '') == resource.data.get('startCalendarDateKey', '');
+
+      // Creator deletes (create-flow rollback), or the sole remaining roster
+      // entry (convert-to-solo / last-failure cleanup: the iOS manager prunes
+      // expired/failed teammate rows before deleting, so the caller is the
+      // only entry left). Honest caveat: with the update rule open for
+      // whole-roster rewrites, a determined client can always rewrite the
+      // roster to itself and then delete — this clause guards against
+      // accidents, not a dedicated attacker (same accepted residual risk as
+      // competitions).
+      allow delete: if request.auth != null
+        && isGroupCreatorOrSoleParticipant(resource.data);
+    }
+
+    // Per-day completion records. Writes are owner-scoped — every iOS write
+    // path (updateProgress, backfillProgressDocs) touches only the signed-in
+    // user's docs. Delete additionally allows the group's creator / sole
+    // participant: deleteGroup batch-purges every participant's progress docs
+    // (rules `get()` sees the pre-batch group doc even when the same batch
+    // deletes it). Owner check first so the common case skips the get().
     match /groupProgress/{progressId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      allow create, read, update, delete: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && (resource.data.userId == request.auth.uid
+            || isGroupCreatorOrSoleParticipant(parentGroupData(resource.data.groupId)));
     }
 
     // In-progress HealthKit values for group running/steps previews.
-    // Official completion remains in groupProgress.
+    // Official completion remains in groupProgress. Owner-scoped writes —
+    // update checks BOTH sides so a teammate can't take over an existing doc
+    // (ids are predictable: groupId_userId_dayNumber) by stamping their own
+    // uid into it.
     match /groupLiveProgress/{progressId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      allow create, read, update, delete: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
     
     // ============================================================
