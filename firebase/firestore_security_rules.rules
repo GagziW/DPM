@@ -39,9 +39,26 @@ service cloud.firestore {
     // CHALLENGES (Personal Records)
     // ============================================================
     
+    // Reads stay open to signed-in users: group teammates render each other's
+    // challenge docs by raw ID (GroupChallengeService.getParticipantChallenge
+    // fetches other participants' challenges for flexible-reps targets), so
+    // reads can't be owner-scoped. Writes ARE owner-scoped — every client
+    // create path (iOS SocialChallengeBuilder, website createChallenge, Android
+    // FirestoreChallengeRepository) stamps userId with the signed-in uid, and
+    // every update/delete targets the caller's own doc. Update checks BOTH
+    // sides so a user can neither modify someone else's challenge nor
+    // re-own a doc by stamping their own uid into it. Admin tooling
+    // (admin-board, firebase-admin CLI, cloud functions) uses the Admin SDK
+    // and bypasses these rules.
     match /challenges/{challengeId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      allow create, read, update, delete: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
     
     // ============================================================
@@ -70,9 +87,22 @@ service cloud.firestore {
     // WORKOUT SESSIONS
     // ============================================================
     
+    // No current client touches this collection (iOS's WorkoutSessionManager
+    // is in-app state; the per-day counters live on users/{uid}.
+    // workoutSessionsByDay). Only the firebase-admin CLI deletes these docs,
+    // via the Admin SDK. Fully owner-scoped — reads included — so any legacy
+    // build that still queries its own sessions (filtered by userId) keeps
+    // working while cross-user access is closed.
     match /workoutSessions/{sessionId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      allow create, read, update, delete: if request.auth != null;
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
     
     // ============================================================
