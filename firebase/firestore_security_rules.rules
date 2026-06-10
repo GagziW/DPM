@@ -102,9 +102,61 @@ service cloud.firestore {
     // COMPETITIONS (Large-scale 10-10,000 people)
     // ============================================================
     
+    // Competition creation is admin-only (product decision, v1). The client
+    // DEBUG gate is cosmetic — this allowlist is the real guard. Seed once via
+    // firebase-admin:  config/admins { adminUids: ["<uid>", …] }
+    // Fail-closed: if the doc is missing, creation is denied for everyone.
+    function isCompetitionAdmin() {
+      return request.auth.uid in get(/databases/$(database)/documents/config/admins).data.adminUids;
+    }
+
     match /competitions/{competitionId} {
-      // TEMPORARY: All operations allowed for authenticated users
-      allow create, read, update, delete: if request.auth != null;
+      allow read: if request.auth != null;
+
+      // Admin-only create. winnerBonusDpm drives a server-side DPM payout at
+      // settlement (`cleanupStaleSocialChallenges`), so an open create rule
+      // would let anyone mint DPM via a self-winning, already-expired
+      // competition. The admin stamps the bonus at creation.
+      allow create: if request.auth != null
+        && request.resource.data.createdBy == request.auth.uid
+        && isCompetitionAdmin()
+        && request.resource.data.startDate is timestamp
+        && request.resource.data.endDate is timestamp
+        && request.resource.data.get('winnerBonusDpm', 0) is int
+        && request.resource.data.get('winnerBonusDpm', 0) >= 0;
+
+      // Joins, team creation, and progress sync are whole-doc transactional
+      // rewrites from clients, so updates stay open to any signed-in user —
+      // but the competition's identity and economic template are pinned, and
+      // settled competitions are frozen (settlement fields are written only by
+      // the cleanup function via Admin SDK, which bypasses these rules; a
+      // client flipping status back to 'active' would replay the DPM payout).
+      // Timestamps are compared at 1s tolerance: iOS round-trips
+      // Timestamp → Date → Timestamp, which can drift by microseconds.
+      // Accepted residual risk: any signed-in user can still rewrite teams[]
+      // of a LIVE competition (inherent to the whole-doc transaction design);
+      // settlement inputs must move server-side if bonuses grow material.
+      allow update: if request.auth != null
+        && !('settledAt' in resource.data)
+        && !('settledAt' in request.resource.data)
+        && request.resource.data.get('winningTeamId', null) == null
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.inviteCode == resource.data.inviteCode
+        && math.abs(request.resource.data.startDate.toMillis() - resource.data.startDate.toMillis()) < 1000
+        && math.abs(request.resource.data.endDate.toMillis() - resource.data.endDate.toMillis()) < 1000
+        && request.resource.data.stakeAmount == resource.data.stakeAmount
+        && request.resource.data.get('winnerBonusDpm', 0) == resource.data.get('winnerBonusDpm', 0);
+
+      // Only the organizer can delete, and only before settlement — a settled
+      // competition is a payout record and stays (archived copy also exists).
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy
+        && !('settledAt' in resource.data);
+    }
+
+    // Admin allowlist for competition creation — server-managed only.
+    match /config/admins {
+      allow read, write: if false;
     }
     
     // ============================================================
