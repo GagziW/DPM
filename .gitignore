@@ -1,0 +1,28 @@
+# DPM workspace repo — tracks ONLY the cross-repo orchestration files
+# (agent instructions, Claude config, skills, hooks, Firebase deploy config).
+# The product repos (DPMSwift, cloud-functions, website, DPMAndroid,
+# admin-board, docs) are independent git repos cloned by ./setup.sh.
+
+# Ignore everything at the top level by default…
+/*
+
+# …except the orchestration files:
+!/.gitignore
+!/CLAUDE.md
+!/AGENTS.md
+!/setup.sh
+!/.mcp.json
+!/.claude
+!/.agents
+!/firebase
+!/firebase.json
+!/.firebaserc
+
+# Claude per-machine state — never share
+.claude/settings.local.json
+.claude/worktrees/
+.claude/launch.json
+.claude/scheduled_tasks.lock
+
+.DS_Store
+*.log

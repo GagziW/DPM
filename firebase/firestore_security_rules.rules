@@ -1,0 +1,293 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================
+    // USER DATA
+    // ============================================================
+    
+    match /users/{userId} {
+      // PRODUCTION COMPATIBILITY: the iOS App Store build (2.1.9) writes the
+      // whole User struct via setData without merge, which strips any fields
+      // it doesn't know about (e.g. `flames`, `totalFlamePoints`, …). The
+      // earlier field-level update lock caught those strips as a "change" to
+      // server-managed fields and denied the write, breaking sign-in for
+      // every 2.1.9 user. Until 2.1.9 cycles out of the App Store, update
+      // stays permissive.
+      //
+      // The integrity that lock was protecting still holds where it matters:
+      //   - The leaderboard is computed from `flameEvents` (server-only).
+      //   - Voucher redemptions are audited in `voucherCodes` (server-only).
+      //   - Stripe-managed subscription fields are overwritten by the next
+      //     webhook event (admin SDK, also rules-bypassing).
+      // So a tampered client can only briefly forge values in its OWN user
+      // doc — annoying, not catastrophic.
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // Lottery subcollection — scoped to the owner. Previously any
+      // authenticated user could read/write ANY other user's lottery docs
+      // (no uid check); a user only ever touches their own lottery data.
+      match /lottery/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // ============================================================
+    // CHALLENGES (Personal Records)
+    // ============================================================
+    
+    match /challenges/{challengeId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // ============================================================
+    // PAYMENTS
+    // ============================================================
+    
+    match /payments/{paymentId} {
+      // Users can create payments for themselves
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      // Clients legitimately update only `status` / `challengeId`
+      // (PaymentService.updatePaymentStatus / linkPaymentToChallenge) — never
+      // `amount`. Require `amount` to be present AND unchanged on every update
+      // so a user can neither lower NOR delete an authorized stake before the
+      // admin-board off-session capture charges it (deleting it would make the
+      // capture read NaN and skip the charge). updateData is a merge, so a legit
+      // status/challengeId update keeps `amount` present and equal; every
+      // payment doc is created with a non-optional amount.
+      allow update: if request.auth != null
+                    && ('amount' in request.resource.data)
+                    && ('amount' in resource.data)
+                    && request.resource.data.amount == resource.data.amount;
+    }
+    
+    // ============================================================
+    // WORKOUT SESSIONS
+    // ============================================================
+    
+    match /workoutSessions/{sessionId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // ============================================================
+    // GROUP CHALLENGES (Multiplayer 2-10 people)
+    // ============================================================
+    
+    match /challengeGroups/{groupId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      // This helps diagnose permission issues
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // Group progress tracking
+    match /groupProgress/{progressId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+
+    // In-progress HealthKit values for group running/steps previews.
+    // Official completion remains in groupProgress.
+    match /groupLiveProgress/{progressId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // ============================================================
+    // COMPETITIONS (Large-scale 10-10,000 people)
+    // ============================================================
+    
+    match /competitions/{competitionId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // ============================================================
+    // ARCHIVE COLLECTIONS (Completed/Failed challenges storage)
+    // ============================================================
+    
+    // Archived challenges
+    match /archivedChallenges/{archiveId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // Archived groups - any authenticated user can archive/read
+    // Security: Archives are immutable once created, and contain historical data
+    match /archivedChallengeGroups/{archiveId} {
+      // Anyone can create archives (triggered when group ends)
+      allow create: if request.auth != null;
+      
+      // Anyone authenticated can read archives (for viewing historical challenges)
+      allow read: if request.auth != null;
+      
+      // No updates or deletes - archives are immutable
+      allow update, delete: if false;
+    }
+    
+    // Archived competitions
+    match /archivedCompetitions/{archiveId} {
+      allow create: if request.auth != null && (
+        // Creator can archive
+        request.auth.uid == request.resource.data.createdBy ||
+        // Allow authenticated users (cloud function also archives)
+        true
+      );
+      
+      // Anyone authenticated can read archived competitions
+      allow read: if request.auth != null;
+      
+      // No updates or deletes - archives are immutable
+      allow update, delete: if false;
+    }
+    
+    // Archived group progress
+    match /archivedGroupProgress/{archiveId} {
+      allow create: if request.auth != null;
+      
+      allow read: if request.auth != null;
+      
+      // No updates or deletes - archives are immutable
+      allow update, delete: if false;
+    }
+    
+    // ============================================================
+    // BADGE SYSTEM
+    // ============================================================
+    
+    // Badge progress (lowercase - matches code)
+    match /badgeProgress/{userId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // User badges collection
+    match /userBadges/{userId} {
+      // TEMPORARY: All operations allowed for authenticated users
+      allow create, read, update, delete: if request.auth != null;
+    }
+    
+    // ============================================================
+    // FLAMES & SPARKS (Social engagement — server-authoritative)
+    //
+    // referrals: audit log of spark <-> flame links (written by trigger).
+    // sparkDailyDigest: per-spark per-day aggregator for batched push.
+    // flameEvents: audit log of credit/link/cap events.
+    //
+    // All three are written exclusively by Cloud Functions (admin SDK).
+    // Clients can only READ rows that pertain to them.
+    // ============================================================
+
+    match /referrals/{referralId} {
+      allow read: if request.auth != null
+                  && (resource.data.sparkId == request.auth.uid
+                      || resource.data.flameId == request.auth.uid);
+      allow write: if false; // server-only via admin SDK
+    }
+
+    match /sparkDailyDigest/{digestId} {
+      allow read: if request.auth != null
+                  && resource.data.sparkId == request.auth.uid;
+      allow write: if false; // server-only
+    }
+
+    match /flameEvents/{eventId} {
+      allow read: if request.auth != null
+                  && (resource.data.sparkId == request.auth.uid
+                      || resource.data.flameId == request.auth.uid);
+      allow write: if false; // server-only
+    }
+    
+    // ============================================================
+    // GLOBAL DATA (Read-only for clients)
+    // ============================================================
+    
+    match /globalStats/{docId} {
+      // TEMPORARY: Allow read without auth for development
+      allow read: if true;
+      allow write: if false; // Cloud Function only
+    }
+
+    // `globalStats/userCounter` is the atomic counter used by
+    // UserManager.getNextUserNumberAtomic() to assign sequential "UserNNN"
+    // names on first sign-in. The transaction reads + writes this single doc
+    // directly from the iOS client — without this rule, every new user
+    // sign-in fails with PERMISSION_DENIED before the user doc is ever
+    // created. The generic globalStats deny above still applies to every
+    // other doc in the collection (badgeStats, etc.).
+    //
+    // FOLLOW-UP: move the counter into a callable Cloud Function so this
+    // single client-writable surface goes away.
+    match /globalStats/userCounter {
+      allow read, write: if request.auth != null;
+    }
+
+    match /globalStats/{docId}/{subcollection}/{subDocId} {
+      allow read: if true;
+      allow write: if false; // Cloud Function only
+    }
+
+    match /leaderboards/{leagueId} {
+      allow read: if true;
+      allow write: if false; // Cloud Function only
+    }
+
+    // ============================================================
+    // VOUCHER CODE STATS (aggregate counters per code)
+    // Written exclusively by the redeemVoucherCode Cloud Function via the
+    // Admin SDK. Clients must never read this — exposing redemption counts
+    // would leak distribution telemetry for an exclusive code.
+    // (This rule precedes the catch-all so it is honored.)
+    // ============================================================
+
+    match /voucherCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    // USER NOTICES (Support / system messages targeted at one user)
+    // Created by Cloud Functions; the website lists them filtered by
+    // userId == auth.uid. Explicit rule placed before the catch-all so
+    // it's still honoured if/when the catch-all is removed.
+    // ============================================================
+
+    match /userNotices/{noticeId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if false;
+      allow update: if request.auth != null &&
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // ADMIN AUDIT LOG (Cloud Function only — Apple token revocations, etc.)
+    // ============================================================
+
+    match /adminActions/{actionId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false; // server-only
+    }
+
+    // ============================================================
+    // CHALLENGE DISPUTES (Failed-challenge appeals)
+    // ============================================================
+
+    match /challengeDisputes/{challengeId} {
+      allow read, create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // (No catch-all — anything not explicitly allowed is denied.)
+    // Field-level write restrictions on /users above only take effect when
+    // they aren't shadowed by a permissive catch-all rule.
+    // ============================================================
+  }
+}

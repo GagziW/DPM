@@ -1,0 +1,12 @@
+{
+  "firestore": {
+    "rules": "firebase/firestore_security_rules.rules",
+    "indexes": "firebase/firestore.indexes.json"
+  },
+  "functions": {
+    "source": "cloud-functions",
+    "predeploy": [
+      "npm --prefix cloud-functions run build"
+    ]
+  }
+}
