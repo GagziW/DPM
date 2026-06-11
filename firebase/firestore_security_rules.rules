@@ -33,8 +33,24 @@ service cloud.firestore {
       match /lottery/{document=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Live Activity push plumbing: ActivityKit tokens + the deadline
+      // schedule doc read by the `liveActivityDeadlineSweep` function.
+      // Device push tokens are credentials for this user's Lock Screen —
+      // strictly owner-scoped. Cloud functions read them via the Admin SDK
+      // (rules-bypassing). The fields the sweep's collectionGroup query
+      // consumes are type-pinned; everything else is owner-trusted (a forged
+      // doc only ever pushes to the owner's own devices).
+      match /liveActivities/{docId} {
+        allow read, delete: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null && request.auth.uid == userId
+          && (!('kind' in request.resource.data) || request.resource.data.kind is string)
+          && (!('nextDeadlineAt' in request.resource.data) || request.resource.data.nextDeadlineAt is timestamp)
+          && (!('token' in request.resource.data) || request.resource.data.token is string)
+          && (!('fcmToken' in request.resource.data) || request.resource.data.fcmToken is string);
+      }
     }
-    
+
     // ============================================================
     // CHALLENGES (Personal Records)
     // ============================================================
@@ -445,6 +461,17 @@ service cloud.firestore {
     match /challengeDisputes/{challengeId} {
       allow read, create, update: if request.auth != null;
       allow delete: if false;
+    }
+
+    // ============================================================
+    // LIVE ACTIVITY FAN-OUT STATE (server-only)
+    // ============================================================
+    // Dedup/throttle bookkeeping for Live Activity pushes (last-sent
+    // signatures, per-day push-to-start ledgers). Written exclusively by
+    // cloud functions via the Admin SDK.
+
+    match /liveActivityState/{stateId} {
+      allow read, write: if false;
     }
 
     // ============================================================

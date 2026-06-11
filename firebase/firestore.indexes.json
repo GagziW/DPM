@@ -151,7 +151,26 @@
         { "fieldPath": "pendingDispatch", "order": "ASCENDING" },
         { "fieldPath": "lastFlameAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "liveActivities",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "nextDeadlineAt", "order": "ASCENDING" }
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "liveActivities",
+      "fieldPath": "competitionId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    }
+  ]
 }
