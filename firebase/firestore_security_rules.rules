@@ -269,6 +269,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
+    // Resolved disputes (challengeResolved/{challengeId}) — written exclusively
+    // by the admin dispute resolver (Admin SDK: admin-board + admin CLI), which
+    // bypasses these rules. Docs carry a top-level `userId` plus the full
+    // challenge + dispute snapshot (rebuttal messages, admin reasons), so reads
+    // are scoped to the owning user — both iOS (ArchiveService) and Android
+    // (FirestoreChallengeRepository) query with `userId == request.auth.uid`.
+    match /challengeResolved/{challengeId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow create, update, delete: if false;
+    }
+
     // Archived groups - any authenticated user can archive/read
     // Security: Archives are immutable once created, and contain historical data
     match /archivedChallengeGroups/{archiveId} {
