@@ -418,6 +418,21 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // APP CONFIG (Runtime feature flags — read by FeatureFlags.refresh())
+    //
+    // `appConfig/features` carries runtime flags (`infiniteGroupsEnabled`,
+    // `showDemoLogin` — the App Store reviewer demo login) read at app launch,
+    // possibly before auth is established, so it is public-read like
+    // globalStats/leaderboards above. The values are non-sensitive booleans.
+    // Clients never write; flip values from the Console or Admin SDK.
+    // ============================================================
+
+    match /appConfig/{docId} {
+      allow read: if true;
+      allow write: if false; // Console / Cloud Function only
+    }
+
+    // ============================================================
     // VOUCHER CODE STATS (aggregate counters per code)
     // Written exclusively by the redeemVoucherCode Cloud Function via the
     // Admin SDK. Clients must never read this — exposing redemption counts
