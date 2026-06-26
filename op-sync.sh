@@ -15,16 +15,16 @@ op inject -f -i "$ROOT/DPM.org/.env.local.tpl"    -o "$ROOT/DPM.org/.env.local"
 op inject -f -i "$ROOT/DPM_admin_board/.env.local.tpl" -o "$ROOT/DPM_admin_board/.env.local"
 
 echo "→ iOS Secrets.xcconfig (op inject) — fixes QuickPose + publishable keys"
-op inject -f -i "$ROOT/DPMSwift/Dopamining/Configurations/Secrets.xcconfig.tpl" \
-             -o "$ROOT/DPMSwift/Dopamining/Configurations/Secrets.xcconfig"
+op inject -f -i "$ROOT/DopaminingSwift/Dopamining/Configurations/Secrets.xcconfig.tpl" \
+             -o "$ROOT/DopaminingSwift/Dopamining/Configurations/Secrets.xcconfig"
 
 echo "→ document files (op document get)"
 mkdir -p "$ROOT/DPM_cloud_functions/keys" "$ROOT/DPMAndroid/app"
 op document get "AppleSignInKey"        --vault $V --force --out-file "$ROOT/DPM_cloud_functions/keys/AuthKey_ZWBH3WGR95.p8"
-op document get "FirebaseConfigIos"     --vault $V --force --out-file "$ROOT/DPMSwift/Dopamining/Configurations/GoogleService-Info.plist"
+op document get "FirebaseConfigIos"     --vault $V --force --out-file "$ROOT/DopaminingSwift/Dopamining/Configurations/GoogleService-Info.plist"
 op document get "FirebaseConfigAndroid" --vault $V --force --out-file "$ROOT/DPMAndroid/app/google-services.json"
-op document get "AppleProvisioningApp"     --vault $V --force --out-file "$ROOT/DPMSwift/AppStore_io.dopamining.DopamorningApp.mobileprovision"
-op document get "AppleProvisioningWidgets" --vault $V --force --out-file "$ROOT/DPMSwift/AppStore_io.dopamining.DopamorningApp.DopaminingWidgets.mobileprovision"
+op document get "AppleProvisioningApp"     --vault $V --force --out-file "$ROOT/DopaminingSwift/AppStore_io.dopamining.DopamorningApp.mobileprovision"
+op document get "AppleProvisioningWidgets" --vault $V --force --out-file "$ROOT/DopaminingSwift/AppStore_io.dopamining.DopamorningApp.DopaminingWidgets.mobileprovision"
 
 echo ""
 echo "✅ Local secret files regenerated from 1Password on this machine."

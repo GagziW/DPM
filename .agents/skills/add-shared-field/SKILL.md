@@ -9,7 +9,7 @@ A Firestore field is a cross-language contract. Adding one in only one client si
 
 ## Checklist (use the exact same camelCase wire name everywhere)
 
-1. **iOS** — `DPMSwift/Dopamining/Models/DynamicModels/{Challenge,User}.swift`: property + Codable key.
+1. **iOS** — `DopaminingSwift/Dopamining/Models/DynamicModels/{Challenge,User}.swift`: property + Codable key.
 2. **Web** — `DPM.org/lib/types/{challenge,user}.ts`: field + any converter in `DPM.org/lib/firebase/converter.ts`.
 3. **Android** — `DPMAndroid/.../domain/model/{ChallengeModel,UserModel}.kt`: nullable field + default. (WIP — OK to defer, but record it.)
 4. **Cloud functions** — `cloud-functions/src/{index,stripe}.ts`: any trigger/callable that reads or writes it (CONTRACT §4–5). New stat → check `globalStats` aggregators.

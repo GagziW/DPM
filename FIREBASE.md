@@ -27,10 +27,10 @@ firebase deploy --only functions       # or: npm --prefix DPM_cloud_functions ru
 
 ## NOT deployed — emulator / test only
 
-- `DPMSwift/firebase.emulator.json` — iOS emulator stack (open rules for tests). Its `indexes`
+- `DopaminingSwift/firebase.emulator.json` — iOS emulator stack (open rules for tests). Its `indexes`
   now points at the canonical `../firebase/firestore.indexes.json` (no separate copy).
-- `DPMSwift/firestore.emulator.rules` — OPEN rules, "NEVER DEPLOY".
-- `DPMSwift/rules-tests/` — Firestore rules unit tests (`dummy.rules` + its own `firebase.json`).
+- `DopaminingSwift/firestore.emulator.rules` — OPEN rules, "NEVER DEPLOY".
+- `DopaminingSwift/rules-tests/` — Firestore rules unit tests (`dummy.rules` + its own `firebase.json`).
 
 ## Admin / ops
 
@@ -42,9 +42,9 @@ firebase deploy --only functions       # or: npm --prefix DPM_cloud_functions ru
 ## Removed in consolidation
 
 - `firebase/firebase.json` + `firebase/.firebaserc` — duplicate deploy config (root is canonical).
-- `DPMSwift/firebase.json` — stale (pointed at old `../cloud-functions` + a missing
+- `DopaminingSwift/firebase.json` — stale (pointed at old `../cloud-functions` + a missing
   `firestore.rules`; carried an orphaned hosting block whose `public` dir didn't exist).
-- `DPMSwift/firestore.indexes.json` — duplicate that had drifted from prod.
+- `DopaminingSwift/firestore.indexes.json` — duplicate that had drifted from prod.
 - `firebase-admin/` repo — merged into `DPM_admin_board/admin-cli/`.
 
 ## ⚠ Action needed

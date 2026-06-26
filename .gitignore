@@ -1,7 +1,7 @@
 # DPM workspace repo — tracks ONLY the cross-repo orchestration files
 # (agent instructions, Claude config, skills, hooks, Firebase deploy config).
-# The product repos (DPMSwift, cloud-functions, DPM.org, DPMAndroid,
-# admin-board, docs) are independent git repos cloned by ./setup.sh.
+# The product repos (DopaminingSwift, DPM_cloud_functions, DPM.org, DPMAndroid,
+# DPM_admin_board, docs) are independent git repos cloned by ./setup.sh.
 
 # Ignore everything at the top level by default…
 /*
@@ -16,6 +16,7 @@
 !/.mcp.json
 !/.claude
 !/.agents
+!/.codex
 !/firebase
 !/firebase.json
 !/.firebaserc

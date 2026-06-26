@@ -11,10 +11,10 @@ canonical build so you don't have to remember the flags.
 
 ## Build
 
-The Xcode project is `DPMSwift/Dopamining.xcodeproj`, scheme `Dopamining`. Run from `DPMSwift/`:
+The Xcode project is `DopaminingSwift/Dopamining.xcodeproj`, scheme `Dopamining`. Run from `DopaminingSwift/`:
 
 ```bash
-cd DPMSwift && xcodebuild \
+cd DopaminingSwift && xcodebuild \
   -scheme Dopamining \
   -project Dopamining.xcodeproj \
   -destination 'platform=iOS Simulator,name=iPhone 16' \

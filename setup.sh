@@ -12,7 +12,7 @@ clone() {
   fi
 }
 
-clone git@github.com:GagziW/DopaminingSwift.git     DPMSwift
+clone git@github.com:GagziW/DopaminingSwift.git     DopaminingSwift
 clone git@github.com:GagziW/DPM_cloud_functions.git DPM_cloud_functions
 clone git@github.com:GagziW/DPM.org.git             DPM.org
 clone git@github.com:GagziW/DPMAndroid.git          DPMAndroid
