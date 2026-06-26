@@ -1,5 +1,9 @@
+# firebase MCP. The --dir is resolved DYNAMICALLY at launch (no hardcoded path),
+# so this file is identical on every machine: it walks up from the launch cwd to
+# the nearest ancestor containing firebase.json (the DPM repo root) — the only
+# firebase.json in the tree lives at the workspace root.
 [mcp_servers.firebase]
-command = "npx"
-args = ["-y", "firebase-tools@latest", "mcp", "--dir", "/Users/gagzi/Code/DPM"]
+command = "bash"
+args = ["-lc", 'd="$PWD"; while [ "$d" != / ] && [ ! -f "$d/firebase.json" ]; do d=$(dirname "$d"); done; [ -f "$d/firebase.json" ] || d="$PWD"; exec npx -y firebase-tools@latest mcp --dir "$d"']
 startup_timeout_sec = 20
 tool_timeout_sec = 120
