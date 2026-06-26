@@ -26,6 +26,22 @@ op document get "FirebaseConfigAndroid" --vault $V --force --out-file "$ROOT/DPM
 op document get "AppleProvisioningApp"     --vault $V --force --out-file "$ROOT/DopaminingSwift/AppStore_io.dopamining.DopamorningApp.mobileprovision"
 op document get "AppleProvisioningWidgets" --vault $V --force --out-file "$ROOT/DopaminingSwift/AppStore_io.dopamining.DopamorningApp.DopaminingWidgets.mobileprovision"
 
+echo "→ fastlane App Store Connect creds (per-machine publishing key)"
+# Machine selector: .dpm-machine (gitignored) holds MacMini or MacBook.
+# Pulls THIS machine's ASC key only, so machines never clobber each other.
+MACHINE="$(cat "$ROOT/.dpm-machine" 2>/dev/null | tr -d '[:space:]')"
+if [ -z "$MACHINE" ]; then
+  echo "  ⚠ skipped — create $ROOT/.dpm-machine with 'MacMini' or 'MacBook'"
+elif op item get "AppleASC$MACHINE" --vault "$V" >/dev/null 2>&1; then
+  printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' \
+    "$(op read "op://DPM/AppleASC$MACHINE/KeyId")" \
+    "$(op read "op://DPM/AppleASC$MACHINE/IssuerId")" > "$ROOT/DopaminingSwift/fastlane/.env"
+  op document get "AppleASCKey$MACHINE" --vault "$V" --force --out-file "$ROOT/DopaminingSwift/AuthKey.p8"
+  echo "  ✓ $MACHINE ASC key → AuthKey.p8 + fastlane/.env"
+else
+  echo "  ⚠ skipped — add to 1Password: item AppleASC$MACHINE (KeyId, IssuerId) + document AppleASCKey$MACHINE"
+fi
+
 echo ""
 echo "✅ Local secret files regenerated from 1Password on this machine."
 echo ""
