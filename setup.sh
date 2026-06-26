@@ -13,10 +13,10 @@ clone() {
 }
 
 clone git@github.com:GagziW/DopaminingSwift.git     DPMSwift
-clone git@github.com:GagziW/DPM_cloud_functions.git cloud-functions
-clone git@github.com:GagziW/DPM.org.git             website
+clone git@github.com:GagziW/DPM_cloud_functions.git DPM_cloud_functions
+clone git@github.com:GagziW/DPM.org.git             DPM.org
 clone git@github.com:GagziW/DPMAndroid.git          DPMAndroid
-clone git@github.com:GagziW/DPM_admin_board.git     admin-board
+clone git@github.com:GagziW/DPM_admin_board.git     DPM_admin_board
 clone git@github.com:GagziW/DPMdocs.git             docs
 
 echo

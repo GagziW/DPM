@@ -10,7 +10,7 @@ A Firestore field is a cross-language contract. Adding one in only one client si
 ## Checklist (use the exact same camelCase wire name everywhere)
 
 1. **iOS** — `DPMSwift/Dopamining/Models/DynamicModels/{Challenge,User}.swift`: property + Codable key.
-2. **Web** — `website/lib/types/{challenge,user}.ts`: field + any converter in `website/lib/firebase/converter.ts`.
+2. **Web** — `DPM.org/lib/types/{challenge,user}.ts`: field + any converter in `DPM.org/lib/firebase/converter.ts`.
 3. **Android** — `DPMAndroid/.../domain/model/{ChallengeModel,UserModel}.kt`: nullable field + default. (WIP — OK to defer, but record it.)
 4. **Cloud functions** — `cloud-functions/src/{index,stripe}.ts`: any trigger/callable that reads or writes it (CONTRACT §4–5). New stat → check `globalStats` aggregators.
 5. **Indexes** — `firebase/firestore.indexes.json` only if you'll *query/order* by it.
@@ -22,5 +22,5 @@ A Firestore field is a cross-language contract. Adding one in only one client si
 - Optional everywhere unless every existing doc is backfilled — old docs won't have it.
 
 ## Verify
-- iOS builds; `cd website && npm test`; functions `cd cloud-functions && npm run build`.
+- iOS builds; `cd DPM.org && npm test`; functions `cd cloud-functions && npm run build`.
 - iOS-first: implement + verify on iOS before Android (never block iOS for parity).

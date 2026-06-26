@@ -6,7 +6,7 @@ allowed-tools: Bash(git:*), Bash(gh:*), Bash(cd:*), Read, Grep, Glob
 
 You are shipping the current work as a pull request. The user's description: **$ARGUMENTS**
 
-This is a monorepo where the root (`/Users/gagzi/Code/DPM`) is **not** a git repo — each platform is its own repo (`DPMSwift/`, `cloud-functions/`, `website/`, `DPMAndroid/`, `admin-board/`, `firebase-admin/`). All git/gh commands MUST run inside the correct sub-repo.
+This is a monorepo where the root (`/Users/gagzi/Code/DPM`) is **not** a git repo — each platform is its own repo (`DPMSwift/`, `cloud-functions/`, `DPM.org/`, `DPMAndroid/`, `admin-board/`, `firebase-admin/`). All git/gh commands MUST run inside the correct sub-repo.
 
 ## Steps
 

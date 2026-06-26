@@ -4,9 +4,9 @@
     "indexes": "firebase/firestore.indexes.json"
   },
   "functions": {
-    "source": "cloud-functions",
+    "source": "DPM_cloud_functions",
     "predeploy": [
-      "npm --prefix cloud-functions run build"
+      "npm --prefix DPM_cloud_functions run build"
     ]
   }
 }

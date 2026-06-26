@@ -59,7 +59,7 @@ service cloud.firestore {
     // challenge docs by raw ID (GroupChallengeService.getParticipantChallenge
     // fetches other participants' challenges for flexible-reps targets), so
     // reads can't be owner-scoped. Writes ARE owner-scoped — every client
-    // create path (iOS SocialChallengeBuilder, website createChallenge, Android
+    // create path (iOS SocialChallengeBuilder, DPM.org createChallenge, Android
     // FirestoreChallengeRepository) stamps userId with the signed-in uid, and
     // every update/delete targets the caller's own doc. Update checks BOTH
     // sides so a user can neither modify someone else's challenge nor
@@ -446,7 +446,7 @@ service cloud.firestore {
 
     // ============================================================
     // USER NOTICES (Support / system messages targeted at one user)
-    // Created by Cloud Functions; the website lists them filtered by
+    // Created by Cloud Functions; the DPM.org lists them filtered by
     // userId == auth.uid. Explicit rule placed before the catch-all so
     // it's still honoured if/when the catch-all is removed.
     // ============================================================
