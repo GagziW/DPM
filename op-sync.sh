@@ -36,8 +36,17 @@ elif op item get "AppleASC$MACHINE" --vault "$V" >/dev/null 2>&1; then
   printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' \
     "$(op read "op://DPM/AppleASC$MACHINE/KeyId")" \
     "$(op read "op://DPM/AppleASC$MACHINE/IssuerId")" > "$ROOT/DopaminingSwift/fastlane/.env"
+  # This machine's login password — lets fastlane unlock the keychain for headless
+  # codesign over SSH (see Fastfile prepare_signing_keychain). Optional: only
+  # appended when the field exists in 1Password.
+  KCPW="$(op read "op://DPM/AppleASC$MACHINE/KeychainPassword" 2>/dev/null || true)"
+  [ -n "$KCPW" ] && printf 'KEYCHAIN_PASSWORD=%s\n' "$KCPW" >> "$ROOT/DopaminingSwift/fastlane/.env"
+  # App Store reviewer demo password (shared, not per-machine). Kept out of the
+  # public iOS repo; synced here so op-sync doesn't wipe it from fastlane/.env.
+  REVIEW_PW="$(op read "op://DPM/AppStoreReview/password" 2>/dev/null || true)"
+  [ -n "$REVIEW_PW" ] && printf 'REVIEW_DEMO_PASSWORD=%s\n' "$REVIEW_PW" >> "$ROOT/DopaminingSwift/fastlane/.env"
   op document get "AppleASCKey$MACHINE" --vault "$V" --force --out-file "$ROOT/DopaminingSwift/AuthKey.p8"
-  echo "  ✓ $MACHINE ASC key → AuthKey.p8 + fastlane/.env"
+  echo "  ✓ $MACHINE ASC key → AuthKey.p8 + fastlane/.env${KCPW:+ (+ keychain password)}"
 else
   echo "  ⚠ skipped — add to 1Password: item AppleASC$MACHINE (KeyId, IssuerId) + document AppleASCKey$MACHINE"
 fi
