@@ -1,11 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ============================================================
     // USER DATA
     // ============================================================
-    
+
     match /users/{userId} {
       // PRODUCTION COMPATIBILITY: the iOS App Store build (2.1.9) writes the
       // whole User struct via setData without merge, which strips any fields
@@ -54,7 +54,7 @@ service cloud.firestore {
     // ============================================================
     // CHALLENGES (Personal Records)
     // ============================================================
-    
+
     // Reads stay open to signed-in users: group teammates render each other's
     // challenge docs by raw ID (GroupChallengeService.getParticipantChallenge
     // fetches other participants' challenges for flexible-reps targets), so
@@ -64,7 +64,7 @@ service cloud.firestore {
     // every update/delete targets the caller's own doc. Update checks BOTH
     // sides so a user can neither modify someone else's challenge nor
     // re-own a doc by stamping their own uid into it. Admin tooling
-    // (admin-board, firebase-admin CLI, cloud functions) uses the Admin SDK
+    // (admin-board, admin-cli, cloud functions) uses the Admin SDK
     // and bypasses these rules.
     match /challenges/{challengeId} {
       allow read: if request.auth != null;
@@ -73,14 +73,15 @@ service cloud.firestore {
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
+      // Admins (staff Group Dashboard cleanup) may delete any challenge.
       allow delete: if request.auth != null
-        && resource.data.userId == request.auth.uid;
+        && (resource.data.userId == request.auth.uid || isCompetitionAdmin());
     }
-    
+
     // ============================================================
     // PAYMENTS
     // ============================================================
-    
+
     match /payments/{paymentId} {
       // Users can create payments for themselves
       allow create: if request.auth != null;
@@ -98,14 +99,14 @@ service cloud.firestore {
                     && ('amount' in resource.data)
                     && request.resource.data.amount == resource.data.amount;
     }
-    
+
     // ============================================================
     // WORKOUT SESSIONS
     // ============================================================
-    
+
     // No current client touches this collection (iOS's WorkoutSessionManager
     // is in-app state; the per-day counters live on users/{uid}.
-    // workoutSessionsByDay). Only the firebase-admin CLI deletes these docs,
+    // workoutSessionsByDay). Only the admin-cli deletes these docs,
     // via the Admin SDK. Fully owner-scoped — reads included — so any legacy
     // build that still queries its own sessions (filtered by userId) keeps
     // working while cross-user access is closed.
@@ -120,11 +121,11 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
-    
+
     // ============================================================
     // GROUP CHALLENGES (Multiplayer 2-10 people)
     // ============================================================
-    
+
     // Group hardening (mirrors the competitions pattern). Reads stay open —
     // the invite-code lookup runs before membership, and teammates render each
     // other's docs, so query rules can't be membership-scoped. Updates stay
@@ -174,9 +175,9 @@ service cloud.firestore {
       // whole-roster rewrites, a determined client can always rewrite the
       // roster to itself and then delete — this clause guards against
       // accidents, not a dedicated attacker (same accepted residual risk as
-      // competitions).
+      // competitions). Admins may also delete (staff Group Dashboard cleanup).
       allow delete: if request.auth != null
-        && isGroupCreatorOrSoleParticipant(resource.data);
+        && (isGroupCreatorOrSoleParticipant(resource.data) || isCompetitionAdmin());
     }
 
     // Per-day completion records. Writes are owner-scoped — every iOS write
@@ -212,15 +213,14 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
-    
+
     // ============================================================
     // COMPETITIONS (Large-scale 10-10,000 people)
     // ============================================================
-    
-    // Competition creation is admin-only (product decision, v1). The client
-    // DEBUG gate is cosmetic — this allowlist is the real guard. Seed once via
-    // firebase-admin:  config/admins { adminUids: ["<uid>", …] }
-    // Fail-closed: if the doc is missing, creation is denied for everyone.
+
+    // Admin allowlist lookup (also gates staff delete clauses above).
+    // Seed once via admin-cli:  config/admins { adminUids: ["<uid>", …] }
+    // Fail-closed: if the doc is missing, admin-gated actions are denied.
     function isCompetitionAdmin() {
       return request.auth.uid in get(/databases/$(database)/documents/config/admins).data.adminUids;
     }
@@ -228,17 +228,21 @@ service cloud.firestore {
     match /competitions/{competitionId} {
       allow read: if request.auth != null;
 
-      // Admin-only create. winnerBonusDpm drives a server-side DPM payout at
-      // settlement (`cleanupStaleSocialChallenges`), so an open create rule
-      // would let anyone mint DPM via a self-winning, already-expired
-      // competition. The admin stamps the bonus at creation.
+      // Open create (product decision 2026-06-12: competitions are a normal
+      // user feature, same as groups) — EXCEPT the economic field.
+      // winnerBonusDpm drives the server-side DPM payout at settlement
+      // (`cleanupStaleSocialChallenges`), so an open bonus would let anyone
+      // mint DPM via a self-winning, short-lived competition. Bonus-carrying
+      // competitions stay admin-only via config/admins; everyone else creates
+      // with bonus 0/absent. The || short-circuits, so normal creations never
+      // read config/admins (no seed required for them).
       allow create: if request.auth != null
         && request.resource.data.createdBy == request.auth.uid
-        && isCompetitionAdmin()
         && request.resource.data.startDate is timestamp
         && request.resource.data.endDate is timestamp
+        && request.resource.data.endDate.toMillis() > request.resource.data.startDate.toMillis()
         && request.resource.data.get('winnerBonusDpm', 0) is int
-        && request.resource.data.get('winnerBonusDpm', 0) >= 0;
+        && (request.resource.data.get('winnerBonusDpm', 0) == 0 || isCompetitionAdmin());
 
       // Joins, team creation, and progress sync are whole-doc transactional
       // rewrites from clients, so updates stay open to any signed-in user —
@@ -269,22 +273,58 @@ service cloud.firestore {
         && !('settledAt' in resource.data);
     }
 
+    // Per-day completion records for competitions — same owner-scoped
+    // contract as groupProgress: every iOS write path (post-workout sync,
+    // backfillProgressDocs) touches only the signed-in user's docs, and the
+    // doc IDs are predictable (competitionId_userId_dayN) so update checks
+    // BOTH sides to stop a rival stamping their uid into someone else's day.
+    // These docs are the per-member audit trail behind teams[] aggregates;
+    // settlement (Admin SDK) reads challenges/progress, never trusts a
+    // client-rewritten roster row alone.
+    match /competitionProgress/{progressId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && (resource.data.userId == request.auth.uid || isCompetitionAdmin());
+    }
+
+    // In-progress reps for competition live rings — competition analog of
+    // groupLiveProgress. Owner-scoped writes; ids are predictable
+    // (competitionId_userId_dayNumber) so update checks BOTH sides to stop a
+    // rival stamping their uid into someone else's doc.
+    match /competitionLiveProgress/{progressId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Admin allowlist for competition creation — server-managed only.
     match /config/admins {
       allow read, write: if false;
     }
-    
+
     // ============================================================
     // ARCHIVE COLLECTIONS (Completed/Failed challenges storage)
     // ============================================================
-    
+
     // Archived challenges
     match /archivedChallenges/{archiveId} {
       // TEMPORARY: All operations allowed for authenticated users
       allow create, read: if request.auth != null;
-      allow update, delete: if false;
+      allow update: if false;
+      // Admins may delete archived copies for staff Group Dashboard cleanup.
+      allow delete: if isCompetitionAdmin();
     }
-    
+
     // Resolved disputes (challengeResolved/{challengeId}) — written exclusively
     // by the admin dispute resolver (Admin SDK: admin-board + admin CLI), which
     // bypasses these rules. Docs carry a top-level `userId` plus the full
@@ -302,14 +342,14 @@ service cloud.firestore {
     match /archivedChallengeGroups/{archiveId} {
       // Anyone can create archives (triggered when group ends)
       allow create: if request.auth != null;
-      
+
       // Anyone authenticated can read archives (for viewing historical challenges)
       allow read: if request.auth != null;
-      
+
       // No updates or deletes - archives are immutable
       allow update, delete: if false;
     }
-    
+
     // Archived competitions
     match /archivedCompetitions/{archiveId} {
       allow create: if request.auth != null && (
@@ -318,40 +358,50 @@ service cloud.firestore {
         // Allow authenticated users (cloud function also archives)
         true
       );
-      
+
       // Anyone authenticated can read archived competitions
       allow read: if request.auth != null;
-      
+
       // No updates or deletes - archives are immutable
       allow update, delete: if false;
     }
-    
+
     // Archived group progress
     match /archivedGroupProgress/{archiveId} {
       allow create: if request.auth != null;
-      
+
       allow read: if request.auth != null;
-      
+
       // No updates or deletes - archives are immutable
       allow update, delete: if false;
     }
-    
+
+    // Archived competition progress (same lifecycle as archivedGroupProgress)
+    match /archivedCompetitionProgress/{archiveId} {
+      allow create: if request.auth != null;
+
+      allow read: if request.auth != null;
+
+      // No updates or deletes - archives are immutable
+      allow update, delete: if false;
+    }
+
     // ============================================================
     // BADGE SYSTEM
     // ============================================================
-    
+
     // Badge progress (lowercase - matches code)
     match /badgeProgress/{userId} {
       // TEMPORARY: All operations allowed for authenticated users
       allow create, read, update, delete: if request.auth != null;
     }
-    
+
     // User badges collection
     match /userBadges/{userId} {
       // TEMPORARY: All operations allowed for authenticated users
       allow create, read, update, delete: if request.auth != null;
     }
-    
+
     // ============================================================
     // FLAMES & SPARKS (Social engagement — server-authoritative)
     //
@@ -382,11 +432,11 @@ service cloud.firestore {
                       || resource.data.flameId == request.auth.uid);
       allow write: if false; // server-only
     }
-    
+
     // ============================================================
     // GLOBAL DATA (Read-only for clients)
     // ============================================================
-    
+
     match /globalStats/{docId} {
       // TEMPORARY: Allow read without auth for development
       allow read: if true;
@@ -446,7 +496,7 @@ service cloud.firestore {
 
     // ============================================================
     // USER NOTICES (Support / system messages targeted at one user)
-    // Created by Cloud Functions; the DPM.org lists them filtered by
+    // Created by Cloud Functions; DPM.org lists them filtered by
     // userId == auth.uid. Explicit rule placed before the catch-all so
     // it's still honoured if/when the catch-all is removed.
     // ============================================================
@@ -476,6 +526,25 @@ service cloud.firestore {
     match /challengeDisputes/{challengeId} {
       allow read, create, update: if request.auth != null;
       allow delete: if false;
+    }
+
+    // ============================================================
+    // ANALYTICS EVENTS (funnel instrumentation — append-only)
+    //
+    // Written fire-and-forget by iOS `AnalyticsService.track` (uid-pinned,
+    // stamps `event`/`userId`/`platform`/`appVersion`/`createdAt` + event
+    // properties). Create-only: clients can never read, edit, or delete the
+    // log — it's read server-side via the Admin SDK only. iOS is the only
+    // emitter today; `platform` is validated so web/Android can join later.
+    // ============================================================
+
+    match /analyticsEvents/{eventId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.event is string
+        && request.resource.data.event.size() < 64
+        && request.resource.data.platform in ['ios', 'android', 'web'];
+      allow read, update, delete: if false; // server-only via Admin SDK
     }
 
     // ============================================================
