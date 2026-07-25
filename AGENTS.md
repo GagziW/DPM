@@ -1,3 +1,6 @@
+# 1password
+Alwyas use the 1Password MCP server when working with environments, secrets or .env files. Do not ask for confirmation if its for managing 1Password Environments
+
 # Dopamining (DPM)
 
 iOS-first habit/stake monorepo. All clients share one Firebase project (`dopaminingswift`).
