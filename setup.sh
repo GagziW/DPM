@@ -21,8 +21,9 @@ clone git@github.com:GagziW/DPMdocs.git             docs
 
 echo
 echo "Done. Next steps:"
-echo "  1. firebase login   (project: dopaminingswift)"
-echo "  2. Open Claude Code from this directory — it picks up CLAUDE.md/AGENTS.md,"
+echo "  1. ./sync-agent-skills.sh   (shared Codex + Claude skills; safe to rerun)"
+echo "  2. firebase login   (project: dopaminingswift)"
+echo "  3. Open Codex or Claude Code from this directory — both pick up AGENTS.md,"
 echo "     .claude/ (skills, agents, hooks, settings) and .mcp.json automatically."
-echo "  3. Read docs/CONTRACT.md before touching any shared Firestore field,"
+echo "  4. Read docs/CONTRACT.md before touching any shared Firestore field,"
 echo "     callable, or security rule."
