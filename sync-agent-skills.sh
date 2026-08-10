@@ -6,6 +6,8 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 GLOBAL_SKILLS_DIR="${HOME}/.agents/skills"
 CLAUDE_DIR="${HOME}/.claude"
 CLAUDE_SKILLS="${CLAUDE_DIR}/skills"
+MATT_SOURCE="https://github.com/mattpocock/skills/archive/84fdeffd12f2ee307994d1eb6feb48173b6e0502.tar.gz"
+FIND_SKILLS_SOURCE="https://github.com/vercel-labs/skills/archive/941a7bcfeca4bf07913b9fb6f8ed81f20ff5297c.tar.gz"
 
 MATT_SKILLS=(
   ask-matt
@@ -37,9 +39,9 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 1
 fi
 
-npx --yes skills@latest add mattpocock/skills \
+npx --yes skills@latest add "${MATT_SOURCE}" \
   --global --yes --agent codex claude-code --skill "${MATT_SKILLS[@]}"
-npx --yes skills@latest add vercel-labs/skills \
+npx --yes skills@latest add "${FIND_SKILLS_SOURCE}" \
   --global --yes --agent codex claude-code --skill find-skills
 
 mkdir -p "${CLAUDE_DIR}"
