@@ -48,9 +48,18 @@ if [[ -L "${CLAUDE_SKILLS}" ]]; then
     echo "Refusing to replace unexpected symlink: ${CLAUDE_SKILLS}" >&2
     exit 1
   fi
+elif [[ -d "${CLAUDE_SKILLS}" ]]; then
+  for skill in "${EXPECTED_SKILLS[@]}"; do
+    claude_skill="${CLAUDE_SKILLS}/${skill}"
+    expected_target="${GLOBAL_SKILLS_DIR}/${skill}"
+    if [[ ! -L "${claude_skill}" ]] || \
+       [[ "$(cd -P "${claude_skill}" && pwd)" != "${expected_target}" ]]; then
+      echo "Unexpected Claude skill path: ${claude_skill}" >&2
+      exit 1
+    fi
+  done
 elif [[ -e "${CLAUDE_SKILLS}" ]]; then
-  echo "Refusing to replace existing path: ${CLAUDE_SKILLS}" >&2
-  echo "Move it aside, then rerun this script." >&2
+  echo "Refusing to replace non-directory path: ${CLAUDE_SKILLS}" >&2
   exit 1
 else
   ln -s ../.agents/skills "${CLAUDE_SKILLS}"
@@ -60,6 +69,18 @@ expected_list="$(printf '%s\n' "${EXPECTED_SKILLS[@]}" | sort)"
 installed_list="$({
   find "${GLOBAL_SKILLS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
 } | sort)"
+
+if [[ -d "${CLAUDE_SKILLS}" && ! -L "${CLAUDE_SKILLS}" ]]; then
+  claude_list="$({
+    find "${CLAUDE_SKILLS}" -mindepth 1 -maxdepth 1 -type l -exec basename {} \;
+  } | sort)"
+  extra_claude="$(comm -13 <(printf '%s\n' "${expected_list}") <(printf '%s\n' "${claude_list}"))"
+  if [[ -n "${extra_claude}" ]]; then
+    echo "Unexpected Claude skill links (left untouched):" >&2
+    printf '%s\n' "${extra_claude}" >&2
+    exit 1
+  fi
+fi
 
 missing="$(comm -23 <(printf '%s\n' "${expected_list}") <(printf '%s\n' "${installed_list}"))"
 extra="$(comm -13 <(printf '%s\n' "${expected_list}") <(printf '%s\n' "${installed_list}"))"
