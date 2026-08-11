@@ -35,7 +35,7 @@ Same UID, same Firestore paths, same callables across all clients. Changing a Fi
 - `DopaminingSwift/AGENTS.md` — iOS specifics (build, patterns, conventions)
 - `DPM_cloud_functions/AGENTS.md` — backend specifics (deploy, callables, Stripe)
 - `docs/CONTRACT.md` — **the cross-platform contract, keyed by seam**: shared Firestore fields, callables, triggers, rules, and where each lives across iOS/web/functions/Android. Read this before changing any shared field, function signature, or rule. Includes known divergences + drift flags. **Upkeep obligation:** after changing any seam (field, callable, trigger, rule, index), update the affected CONTRACT.md table in the same piece of work and push it (`docs/` is its own repo). To reconcile wholesale, run the `audit-contract` skill.
-- `docs/` — HTML architecture docs (open `docs/overview.html`)
+- `docs/economy-simulator.html` — interactive DPM economy simulator
 
 ## Agent skills
 
