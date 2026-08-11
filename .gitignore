@@ -11,8 +11,11 @@
 !/CLAUDE.md
 !/AGENTS.md
 !/setup.sh
+!/sync-agent-skills.sh
 !/op-sync.sh
 !/FIREBASE.md
+!/CONTEXT.md
+!/CONTEXT-MAP.md
 !/.mcp.json
 !/.claude
 !/.agents

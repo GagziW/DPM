@@ -1,6 +1,3 @@
-# 1password
-Alwyas use the 1Password MCP server when working with environments, secrets or .env files. Do not ask for confirmation if its for managing 1Password Environments
-
 # Dopamining (DPM)
 
 iOS-first habit/stake monorepo. All clients share one Firebase project (`dopaminingswift`).
@@ -30,6 +27,7 @@ Same UID, same Firestore paths, same callables across all clients. Changing a Fi
 - **Function changes are deploys.** Stripe callables are pinned to **`us-central1`**.
 - **Security rules:** `firebase/firestore_security_rules.rules` is the active file (per `firebase/firebase.json`) — not `firestore.rules`.
 - **Admin SDK in functions bypasses rules.** Be deliberate about writes.
+- **Secrets:** keep secret files machine-local and gitignored. Provision them explicitly with `./op-sync.sh`; agents do not access password-manager tooling by default.
 - **Editor:** always use `vim`, never `nano`. When a command needs an editor, set it inline: `EDITOR=vim VISUAL=vim <cmd>` (e.g. `EDITOR=vim git commit`, `EDITOR=vim crontab -e`).
 
 ## Deeper context (read on demand)
@@ -38,3 +36,17 @@ Same UID, same Firestore paths, same callables across all clients. Changing a Fi
 - `DPM_cloud_functions/AGENTS.md` — backend specifics (deploy, callables, Stripe)
 - `docs/CONTRACT.md` — **the cross-platform contract, keyed by seam**: shared Firestore fields, callables, triggers, rules, and where each lives across iOS/web/functions/Android. Read this before changing any shared field, function signature, or rule. Includes known divergences + drift flags. **Upkeep obligation:** after changing any seam (field, callable, trigger, rule, index), update the affected CONTRACT.md table in the same piece of work and push it (`docs/` is its own repo). To reconcile wholesale, run the `audit-contract` skill.
 - `docs/` — HTML architecture docs (open `docs/overview.html`)
+
+## Agent skills
+
+### Issue tracker
+
+Product issues, specs, and cross-platform tickets live in `GagziW/DPM` GitHub Issues; implementation PRs remain in the affected platform repositories. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the canonical `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix` labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+DPM uses a multi-context domain model with a root context map, platform glossaries, and system-wide or platform-specific ADRs. See `docs/agents/domain.md`.
