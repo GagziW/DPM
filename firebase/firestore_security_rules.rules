@@ -338,6 +338,64 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // Async 1v1 Duels. Creation is deterministically keyed by the creator's
+    // physical attempt, so ambiguous retries resolve to the same document.
+    // The opponent may submit exactly once; result/economy fields remain
+    // server-owned. The creator may only acknowledge a completed reveal.
+    match /duels/{duelId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.creatorId == request.auth.uid
+        && (
+          !('creatorAttemptId' in request.resource.data)
+          || (request.resource.data.creatorAttemptId is string
+            && duelId == request.auth.uid + '_' + request.resource.data.creatorAttemptId
+            && getAfter(/databases/$(database)/documents/duelInviteCodes/$(request.resource.data.inviteCode)).data.duelId == duelId)
+        )
+        && request.resource.data.status == 'pending'
+        && request.resource.data.creatorScore is int
+        && request.resource.data.get('winnerId', null) == null
+        && request.resource.data.get('rewardedUserId', null) == null
+        && request.resource.data.get('opponentScore', null) == null;
+
+      allow update: if request.auth != null
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'completed'
+        && resource.data.creatorId != request.auth.uid
+        && request.resource.data.opponentId == request.auth.uid
+        && request.resource.data.opponentScore is int
+        && request.resource.data.creatorId == resource.data.creatorId
+        && request.resource.data.get('creatorAttemptId', null) == resource.data.get('creatorAttemptId', null)
+        && request.resource.data.creatorScore == resource.data.creatorScore
+        && request.resource.data.inviteCode == resource.data.inviteCode
+        && request.resource.data.workoutType == resource.data.workoutType
+        && request.resource.data.durationSeconds == resource.data.durationSeconds
+        && request.resource.data.get('winnerId', null) == null
+        && request.resource.data.get('rewardedUserId', null) == null
+        && request.time < resource.data.expiresAt;
+
+      allow update: if request.auth != null
+        && resource.data.creatorId == request.auth.uid
+        && resource.data.status == 'completed'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['creatorResultSeen'])
+        && request.resource.data.creatorResultSeen == true;
+
+      allow delete: if request.auth != null
+        && resource.data.creatorId == request.auth.uid;
+    }
+
+    match /duelInviteCodes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['duelId', 'creatorId', 'createdAt'])
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.createdAt is timestamp
+        && getAfter(/databases/$(database)/documents/duels/$(request.resource.data.duelId)).data.creatorId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/duels/$(request.resource.data.duelId)).data.inviteCode == code;
+      allow update, delete: if false;
+    }
+
     // Admin allowlist for competition creation — server-managed only.
     match /config/admins {
       allow read, write: if false;
