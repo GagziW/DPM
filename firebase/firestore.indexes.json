@@ -1,6 +1,34 @@
 {
   "indexes": [
     {
+      "collectionGroup": "workoutCreditEffects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nextAttemptAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "workoutCreditEffects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expireAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
@@ -488,6 +516,16 @@
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "workoutCredits",
+      "fieldPath": "receipt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "workoutCredits",
+      "fieldPath": "payloadHash",
+      "indexes": []
+    },
     {
       "collectionGroup": "liveActivities",
       "fieldPath": "competitionId",

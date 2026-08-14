@@ -122,6 +122,37 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // Workout Credit is an Admin-SDK-only write model. Clients receive their
+    // receipt through callables and never read or mutate these collections
+    // directly, which keeps idempotency and effect status authoritative.
+    match /workoutCredits/{creditId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditEffects/{effectId} {
+      allow read, write: if false;
+    }
+    match /duelSkipClaims/{claimId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditCleanupJobs/{jobId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditStatShards/{shardId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditMiningDays/{dayId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditBadgeInputs/{inputId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditMultiplayerInputs/{inputId} {
+      allow read, write: if false;
+    }
+    match /workoutCreditNotificationInputs/{inputId} {
+      allow read, write: if false;
+    }
+
     // ============================================================
     // GROUP CHALLENGES (Multiplayer 2-10 people)
     // ============================================================
@@ -320,7 +351,15 @@ service cloud.firestore {
     match /archivedChallenges/{archiveId} {
       // TEMPORARY: All operations allowed for authenticated users
       allow create, read: if request.auth != null;
-      allow update: if false;
+      // Long-offline Workout Credit recovery may need to claim the one-way
+      // perfect-completion marker after the live challenge has been archived.
+      // No other archived data is mutable by clients.
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['perfectStatsApplied'])
+        && request.resource.data.perfectStatsApplied == true
+        && resource.data.get('perfectStatsApplied', false) != true;
       // Admins may delete archived copies for staff Group Dashboard cleanup.
       allow delete: if isCompetitionAdmin();
     }
