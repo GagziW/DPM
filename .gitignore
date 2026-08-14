@@ -11,6 +11,7 @@
 !/CLAUDE.md
 !/AGENTS.md
 !/setup.sh
+!/sync-repos.sh
 !/sync-agent-skills.sh
 !/op-sync.sh
 !/FIREBASE.md
