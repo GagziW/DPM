@@ -72,7 +72,17 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid;
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        // Released clients resolve competition misses locally before the
+        // hourly Admin-SDK backstop. Never let a client make cooldown
+        // irreversible while the authoritative live document still has a
+        // Life available; the server resolver consumes coverage first and
+        // bypasses rules when failure is genuinely due.
+        && !(resource.data.get('competitionId', '') != ''
+          && resource.data.get('status', '') == 'active'
+          && resource.data.get('remainingSkipDays', 0) > 0
+          && (request.resource.data.get('status', '') == 'cooldown'
+            || request.resource.data.get('status', '') == 'failed'));
       // Admins (staff Group Dashboard cleanup) may delete any challenge.
       allow delete: if request.auth != null
         && (resource.data.userId == request.auth.uid || isCompetitionAdmin());
