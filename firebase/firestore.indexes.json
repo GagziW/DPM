@@ -69,6 +69,60 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "totalReps",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "leaderboardActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dpmBalance",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "leaderboardActive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totalFlamePoints",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "leaderboardActive",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "highestLeagueTier",
           "order": "ASCENDING"
         },
