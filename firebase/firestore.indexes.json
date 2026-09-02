@@ -33,20 +33,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "leaderboardEligible",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "currentStreak",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "leaderboardActive",
           "order": "ASCENDING"
         },
@@ -194,24 +180,6 @@
         },
         {
           "fieldPath": "totalFlamePoints",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "leaderboardEligible",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "currentStreak",
           "order": "DESCENDING"
         },
         {
