@@ -23,9 +23,19 @@ service cloud.firestore {
       // So a tampered client can only briefly forge values in its OWN user
       // doc — annoying, not catastrophic.
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      // Account hold is server-owned, even while legacy user writes stay permissive.
+      allow create: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['accountHold']);
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accountHold'])
+        && (!resource.data.keys().hasAny(['accountHold'])
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'activeChallenge', 'lastActiveChallengeId', 'currentStreak', 'longestStreak',
+            'totalActiveDays', 'totalReps', 'allCompletedDates', 'lastWorkoutDate',
+            'lastStreakKeepAliveDate', 'game', 'timezone'
+          ]));
+      allow delete: if request.auth != null && request.auth.uid == userId
+        && !resource.data.keys().hasAny(['accountHold']);
 
       // Lottery subcollection — scoped to the owner. Previously any
       // authenticated user could read/write ANY other user's lottery docs
@@ -66,13 +76,20 @@ service cloud.firestore {
     // re-own a doc by stamping their own uid into it. Admin tooling
     // (admin-board, admin-cli, cloud functions) uses the Admin SDK
     // and bypasses these rules.
+    function accountIsOnHold(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.keys().hasAny(['accountHold']);
+    }
+
     match /challenges/{challengeId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && !accountIsOnHold(request.auth.uid);
       allow update: if request.auth != null
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
+        && !accountIsOnHold(request.auth.uid)
         // Released clients resolve competition misses locally before the
         // hourly Admin-SDK backstop. Never let a client make cooldown
         // irreversible while the authoritative live document still has a
@@ -85,7 +102,7 @@ service cloud.firestore {
             || request.resource.data.get('status', '') == 'failed'));
       // Admins (staff Group Dashboard cleanup) may delete any challenge.
       allow delete: if request.auth != null
-        && (resource.data.userId == request.auth.uid || isCompetitionAdmin());
+        && ((resource.data.userId == request.auth.uid && !accountIsOnHold(request.auth.uid)) || isCompetitionAdmin());
     }
 
     // ============================================================
@@ -94,7 +111,11 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       // Users can create payments for themselves
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && (request.resource.data.get('challengeId', '') in ['', null]
+          || (request.resource.data.challengeId is string
+            && getAfter(/databases/$(database)/documents/challenges/$(request.resource.data.challengeId)).data.userId == request.auth.uid));
       allow read: if request.auth != null;
       // Clients legitimately update only `status` / `challengeId`
       // (PaymentService.updatePaymentStatus / linkPaymentToChallenge) — never
@@ -105,6 +126,14 @@ service cloud.firestore {
       // status/challengeId update keeps `amount` present and equal; every
       // payment doc is created with a non-optional amount.
       allow update: if request.auth != null
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == resource.data.userId
+                    // First link is client-authored after challenge creation;
+                    // an established monetary commitment cannot be relinked.
+                    && (request.resource.data.get('challengeId', null) == resource.data.get('challengeId', null)
+                      || (resource.data.get('challengeId', '') in ['', null]
+                        && request.resource.data.challengeId is string
+                        && getAfter(/databases/$(database)/documents/challenges/$(request.resource.data.challengeId)).data.userId == request.auth.uid))
                     && ('amount' in request.resource.data)
                     && ('amount' in resource.data)
                     && request.resource.data.amount == resource.data.amount;
@@ -229,9 +258,9 @@ service cloud.firestore {
     // deletes it). Owner check first so the common case skips the get().
     match /groupProgress/{progressId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null
@@ -246,9 +275,9 @@ service cloud.firestore {
     // uid into it.
     match /groupLiveProgress/{progressId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null
@@ -385,7 +414,7 @@ service cloud.firestore {
     // day from being counted twice or redirected after aggregation.
     match /competitionProgress/{progressId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && request.resource.data.userId == request.auth.uid
         && (
              progressId == request.resource.data.competitionId + '_' + request.auth.uid + '_day' + string(request.resource.data.dayNumber)
@@ -396,7 +425,7 @@ service cloud.firestore {
            )
         && !('agg' in request.resource.data)
         && competitionProgressBoundsOK();
-      allow update: if request.auth != null
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.competitionId == resource.data.competitionId
@@ -424,11 +453,11 @@ service cloud.firestore {
 
     match /competitionLiveProgress/{progressId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && request.resource.data.userId == request.auth.uid
         && progressId == request.resource.data.competitionId + '_' + request.auth.uid + '_' + string(request.resource.data.dayNumber)
         && competitionLiveBoundsOK();
-      allow update: if request.auth != null
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.competitionId == resource.data.competitionId
@@ -445,7 +474,7 @@ service cloud.firestore {
     match /duels/{duelId} {
       allow read: if request.auth != null;
 
-      allow create: if request.auth != null
+      allow create: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && request.resource.data.creatorId == request.auth.uid
         && (
           !('creatorAttemptId' in request.resource.data)
@@ -459,7 +488,7 @@ service cloud.firestore {
         && request.resource.data.get('rewardedUserId', null) == null
         && request.resource.data.get('opponentScore', null) == null;
 
-      allow update: if request.auth != null
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.status == 'pending'
         && request.resource.data.status == 'completed'
         && resource.data.creatorId != request.auth.uid
