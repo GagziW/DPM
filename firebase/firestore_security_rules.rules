@@ -23,11 +23,14 @@ service cloud.firestore {
       // So a tampered client can only briefly forge values in its OWN user
       // doc — annoying, not catastrophic.
       allow read: if request.auth != null;
-      // Account hold is server-owned, even while legacy user writes stay permissive.
+      // Account hold and Game v4 skill levels are server-owned, even while
+      // legacy user writes stay permissive: `skillLevels` is written only by
+      // the `purchaseSkillLevel` callable, because Workout Credit pays DPM
+      // from it (a client could otherwise grant itself Payout 31).
       allow create: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(['accountHold']);
+        && !request.resource.data.keys().hasAny(['accountHold', 'skillLevels']);
       allow update: if request.auth != null && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accountHold'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accountHold', 'skillLevels'])
         && (!resource.data.keys().hasAny(['accountHold'])
           || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'activeChallenge', 'lastActiveChallengeId', 'currentStreak', 'longestStreak',
