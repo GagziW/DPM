@@ -488,10 +488,36 @@ service cloud.firestore {
         && request.resource.data.get('rewardedUserId', null) == null
         && request.resource.data.get('opponentScore', null) == null;
 
+      // Reservation: the first eligible person to open the link takes the
+      // Duel. Only their identity + server time land; scores stay absent.
+      allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
+        && resource.data.status == 'pending'
+        && request.time < resource.data.expiresAt
+        && resource.data.creatorId != request.auth.uid
+        && resource.data.get('opponentId', null) == null
+        && resource.data.get('opponentScore', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['opponentId', 'opponentName', 'opponentAvatarEmoji', 'opponentReservedAt'])
+        && request.resource.data.opponentId == request.auth.uid
+        && request.resource.data.opponentName is string
+        && request.resource.data.opponentName.size() <= 100
+        && (!('opponentAvatarEmoji' in request.resource.data)
+            || (request.resource.data.opponentAvatarEmoji is string
+                && request.resource.data.opponentAvatarEmoji.size() <= 32))
+        && request.resource.data.opponentReservedAt == request.time;
+
+      // Submission: only the holder, if the Duel was reserved. Writes only
+      // the opponent's attempt — outcome/economy fields stay server-owned
+      // (a client-stamped resolvedAt would make onDuelWritten skip settling).
       allow update: if request.auth != null && !accountIsOnHold(request.auth.uid)
         && resource.data.status == 'pending'
         && request.resource.data.status == 'completed'
         && resource.data.creatorId != request.auth.uid
+        && (resource.data.get('opponentId', null) == null
+            || resource.data.opponentId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['opponentId', 'opponentAttemptId', 'opponentName', 'opponentAvatarEmoji',
+                       'opponentScore', 'opponentRepTimeline', 'opponentAttemptAt', 'status'])
         && request.resource.data.opponentId == request.auth.uid
         && request.resource.data.opponentScore is int
         && request.resource.data.creatorId == resource.data.creatorId
