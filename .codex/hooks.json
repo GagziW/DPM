@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/leonwitt/codeMacMini/DPM/.codex/hooks/guard-sensitive-files.sh'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/leonwitt/codeMacMini/DPM/.codex/hooks/no-sim-boot-build.sh'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/leonwitt/codeMacMini/DPM/.codex/hooks/typecheck-functions.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}
