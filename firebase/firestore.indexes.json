@@ -641,6 +641,34 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "recentFinishes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "perfectWeek",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "finishedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "recentFinishes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "finishedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "localMinute",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

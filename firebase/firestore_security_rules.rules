@@ -719,6 +719,14 @@ service cloud.firestore {
       allow write: if false; // Cloud Function only
     }
 
+    // Today's Wall: one entry per board-eligible player, their latest
+    // completed day (name, avatar, local finish minute, 7-day count).
+    // Written by `onUserRepsChanged`; signed-in players read it.
+    match /recentFinishes/{userId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Cloud Function only
+    }
+
     // ============================================================
     // APP CONFIG (Runtime feature flags — read by FeatureFlags.refresh())
     //
