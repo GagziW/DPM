@@ -4,8 +4,9 @@ iOS-first habit/stake monorepo. All clients share one Firebase project (`dopamin
 
 ## Platforms (priority order)
 
-- **`DopaminingSwift/`** — iOS, public, production. **The priority.** Product decisions originate here.
-- **`DPM_cloud_functions/`** — Firebase Functions (TypeScript). Shared backend for iOS, Android, DPM.org.
+- **`DPMv4/`** (GitHub `GagziW/DpmSwift`) — **all new work happens here** (Leon, 2026-10-10): the v4 iOS app in `DPMv4/app/` (imported from `DopaminingSwift` at `e31cbfe6`), the v4 backend in `DPMv4/functions/` (database `dpm-v4`, Functions codebase `dpm-v4`), the `DPMv4Client` Swift package, and the v4 docs. Read `DPMv4/AGENTS.md` and `DPMv4/docs/PLAN.md` first.
+- **`DopaminingSwift/`** — iOS, the live App Store/TestFlight app until the v4 cutover. **Frozen for new features**: bug fixes only, and every fix must also land in `DPMv4/app/`.
+- **`DPM_cloud_functions/`** — the old Firebase Functions backend on `(default)`. Frozen: bug fixes only until cutover.
 - **`DPM.org/`** — Next.js + Stripe. Marketing + challenge creation flow.
 - **`DPMAndroid/`** — Kotlin, WIP, not public. Follows iOS; never block iOS for parity.
 - **`DPM_admin_board/`** — internal ops: admin web app + `admin-cli/` Admin-SDK scripts (formerly the separate `firebase-admin` repo).

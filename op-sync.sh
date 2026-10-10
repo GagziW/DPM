@@ -14,9 +14,19 @@ echo "→ .env files (op inject)"
 op inject -f -i "$ROOT/DPM.org/.env.local.tpl"    -o "$ROOT/DPM.org/.env.local"
 op inject -f -i "$ROOT/DPM_admin_board/.env.local.tpl" -o "$ROOT/DPM_admin_board/.env.local"
 
-echo "→ iOS Secrets.xcconfig (op inject) — fixes QuickPose + publishable keys"
-op inject -f -i "$ROOT/DopaminingSwift/Dopamining/Configurations/Secrets.xcconfig.tpl" \
-             -o "$ROOT/DopaminingSwift/Dopamining/Configurations/Secrets.xcconfig"
+# iOS app checkouts: the frozen DopaminingSwift app and the v4 app (DPMv4/app,
+# GitHub GagziW/DpmSwift). Each gets its own secret files when present.
+IOS_APPS=()
+for app in "$ROOT/DopaminingSwift" "$ROOT/DPMv4/app"; do
+  [ -d "$app/Dopamining/Configurations" ] && IOS_APPS+=("$app")
+done
+
+echo "→ iOS Secrets.xcconfig (op inject) — publishable keys"
+for app in "${IOS_APPS[@]}"; do
+  op inject -f -i "$app/Dopamining/Configurations/Secrets.xcconfig.tpl" \
+               -o "$app/Dopamining/Configurations/Secrets.xcconfig"
+  echo "  ✓ ${app#"$ROOT/"}"
+done
 
 echo "→ document files (op document get)"
 mkdir -p "$ROOT/DPM_cloud_functions/keys" "$ROOT/DPMAndroid/app"
@@ -33,20 +43,24 @@ MACHINE="$(cat "$ROOT/.dpm-machine" 2>/dev/null | tr -d '[:space:]')"
 if [ -z "$MACHINE" ]; then
   echo "  ⚠ skipped — create $ROOT/.dpm-machine with 'MacMini' or 'MacBook'"
 elif op item get "AppleASC$MACHINE" --vault "$V" >/dev/null 2>&1; then
-  printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' \
-    "$(op read "op://DPM/AppleASC$MACHINE/KeyId")" \
-    "$(op read "op://DPM/AppleASC$MACHINE/IssuerId")" > "$ROOT/DopaminingSwift/fastlane/.env"
+  ASC_KEY_ID="$(op read "op://DPM/AppleASC$MACHINE/KeyId")"
+  ASC_ISSUER_ID="$(op read "op://DPM/AppleASC$MACHINE/IssuerId")"
   # This machine's login password — lets fastlane unlock the keychain for headless
   # codesign over SSH (see Fastfile prepare_signing_keychain). Optional: only
-  # appended when the field exists in 1Password.
+  # written when the field exists in 1Password.
   KCPW="$(op read "op://DPM/AppleASC$MACHINE/KeychainPassword" 2>/dev/null || true)"
-  [ -n "$KCPW" ] && printf 'KEYCHAIN_PASSWORD=%s\n' "$KCPW" >> "$ROOT/DopaminingSwift/fastlane/.env"
   # App Store reviewer demo password (shared, not per-machine). Kept out of the
-  # public iOS repo; synced here so op-sync doesn't wipe it from fastlane/.env.
+  # public iOS repos; synced here so op-sync doesn't wipe it from fastlane/.env.
   REVIEW_PW="$(op read "op://DPM/AppStoreReview/password" 2>/dev/null || true)"
-  [ -n "$REVIEW_PW" ] && printf 'REVIEW_DEMO_PASSWORD=%s\n' "$REVIEW_PW" >> "$ROOT/DopaminingSwift/fastlane/.env"
-  op document get "AppleASCKey$MACHINE" --vault "$V" --force --out-file "$ROOT/DopaminingSwift/AuthKey.p8"
-  echo "  ✓ $MACHINE ASC key → AuthKey.p8 + fastlane/.env${KCPW:+ (+ keychain password)}"
+  for app in "${IOS_APPS[@]}"; do
+    ( umask 077
+      printf 'ASC_KEY_ID=%s\nASC_ISSUER_ID=%s\n' "$ASC_KEY_ID" "$ASC_ISSUER_ID" > "$app/fastlane/.env"
+      [ -n "$KCPW" ] && printf 'KEYCHAIN_PASSWORD=%s\n' "$KCPW" >> "$app/fastlane/.env"
+      [ -n "$REVIEW_PW" ] && printf 'REVIEW_DEMO_PASSWORD=%s\n' "$REVIEW_PW" >> "$app/fastlane/.env"
+      true )
+    op document get "AppleASCKey$MACHINE" --vault "$V" --force --out-file "$app/AuthKey.p8"
+    echo "  ✓ $MACHINE ASC key → ${app#"$ROOT/"}/AuthKey.p8 + fastlane/.env${KCPW:+ (+ keychain password)}"
+  done
 else
   echo "  ⚠ skipped — add to 1Password: item AppleASC$MACHINE (KeyId, IssuerId) + document AppleASCKey$MACHINE"
 fi
