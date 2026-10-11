@@ -5,6 +5,7 @@ set -u
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORIES=(
   "."
+  "DPMv4"
   "DopaminingSwift"
   "DPM_cloud_functions"
   "DPM.org"
@@ -55,6 +56,14 @@ for repository in "${REPOSITORIES[@]}"; do
   before="$(git -C "${path}" rev-parse HEAD)"
   if ! git -C "${path}" pull --ff-only; then
     echo "FAIL: could not fast-forward ${branch} from ${upstream}" >&2
+    counts="$(git -C "${path}" rev-list --left-right --count "HEAD...${upstream}" 2>/dev/null || true)"
+    if [[ -n "${counts}" ]]; then
+      read -r ahead behind <<<"${counts}"
+      if ((ahead > 0 && behind > 0)); then
+        echo "      ${branch} has ${ahead} local commit(s) not on ${upstream} and is ${behind} behind." >&2
+        echo "      Replay them on top and publish: git -C \"${path}\" pull --rebase && git -C \"${path}\" push" >&2
+      fi
+    fi
     ((failed += 1))
     continue
   fi
