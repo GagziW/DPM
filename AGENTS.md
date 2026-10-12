@@ -1,43 +1,43 @@
 # Dopamining (DPM)
 
-iOS-first habit/stake monorepo. All clients share one Firebase project (`dopaminingswift`).
+iOS-first monorepo. All clients share one Firebase project (`dopaminingswift`) and one set of UIDs.
 
-## Platforms (priority order)
+## DPMv4 — where all new work goes
 
-- **`DPMv4/`** (GitHub `GagziW/DpmSwift`) — **all new work happens here** (Leon, 2026-10-10): the v4 iOS app in `DPMv4/app/` (imported from `DopaminingSwift` at `e31cbfe6`), the v4 backend in `DPMv4/functions/` (database `dpm-v4`, Functions codebase `dpm-v4`), the `DPMv4Client` Swift package, and the v4 docs. Read `DPMv4/AGENTS.md` and `DPMv4/docs/PLAN.md` first.
-- **`DopaminingSwift/`** — iOS, the live App Store/TestFlight app until the v4 cutover. **Frozen for new features**: bug fixes only, and every fix must also land in `DPMv4/app/`.
-- **`DPM_cloud_functions/`** — the old Firebase Functions backend on `(default)`. Frozen: bug fixes only until cutover.
-- **`DPM.org/`** — Next.js + Stripe. Marketing + challenge creation flow.
-- **`DPMAndroid/`** — Kotlin, WIP, not public. Follows iOS; never block iOS for parity.
-- **`DPM_admin_board/`** — internal ops: admin web app + `admin-cli/` Admin-SDK scripts (formerly the separate `firebase-admin` repo).
+**`DPMv4/`** (GitHub `GagziW/DpmSwift`) is the product since 2026-10-10: every new feature, backend change and cloud function lands here. Read `DPMv4/AGENTS.md` and `DPMv4/docs/PLAN.md` first.
 
-## Cross-platform contract
+- `DPMv4/app/` — the iOS app, 2.3.0 onward (imported from `DopaminingSwift` at `e31cbfe6`). Build, test and conventions: `DPMv4/app/AGENTS.md`.
+- `DPMv4/functions/` — the backend: Functions codebase `dpm-v4` on Firestore database `dpm-v4`. Run, test, deploy, secrets, ops jobs and migration: `DPMv4/README.md`.
+- `DPMv4/firebase/` — rules + indexes of `dpm-v4`; `DPMv4/firebase.json` is the v4 deploy config.
+- `DPMv4/ios/DPMv4Client/` — the Swift data layer the app links (models, policy mirrors, callables).
+- `DPMv4/docs/` — `PLAN` (design, cutover), `CONTRACT` (the seams), `DECISIONS`, `MIGRATION`; `DPMv4/fixtures/` pins the numbers Swift and TypeScript share.
 
-Source of truth for "what the user is doing right now":
+What the player is doing right now: `users/{uid}.challenge` (embedded) plus one `users/{uid}/days/{yyyy-MM-dd}` record per day, in database `dpm-v4`.
 
-```
-users/{uid}.activeChallenge  →  challenges/{id}
-```
+## Legacy — keep it running, fix only
 
-Same UID, same Firestore paths, same callables across all clients. Changing a Firestore field, function signature, or security rule changes all three at once — check siblings before merging.
+Everything outside `DPMv4/` is deprecated. It serves the live 2.2.x App Store app and the `(default)` database until the v4 cutover (`DPMv4/docs/PLAN.md` §8), then retires. Keep it working so a production break can still be fixed there; build nothing new on it.
+
+- **`DopaminingSwift/`** — the 2.2.x App Store app. Bug fixes only, and every fix also lands in `DPMv4/app/`.
+- **`DPM_cloud_functions/`** — the old backend (≈80 functions on `(default)`). Bug fixes only. Deploys from the root `firebase.json`; its rules file is `firebase/firestore_security_rules.rules` (`FIREBASE.md`).
+- **`docs/CONTRACT.md`** — the old contract: `users/{uid}.activeChallenge → challenges/{id}` on `(default)`. A legacy seam fix updates it in the same piece of work and pushes it (`docs/` is its own repo); `audit-contract` reconciles it wholesale.
+- **`DPM.org/`** (Next.js + Stripe), **`DPM_admin_board/`** (ops web app + `admin-cli/`), **`DPMAndroid/`** (Kotlin, parked) — still on `(default)`. PLAN §8.1 narrows the website and repoints it and the admin board at `dpm-v4`; Android stays parked.
+- `DopaminingSwift-main/`, `DPMdocs/` — second clones of old branches; edit the real checkouts above.
 
 ## Working rules
 
-- **iOS-first.** Implement and verify on iOS before porting to Android.
-- **Firestore parity.** New field on `Challenge` / `User` → update iOS model + cloud functions + `DPM.org/lib/types/` + Android model + `docs/CONTRACT.md` (the `add-shared-field` skill walks all of it).
-- **Function changes are deploys.** Stripe callables are pinned to **`us-central1`**.
-- **Security rules:** `firebase/firestore_security_rules.rules` is the active file (per `firebase/firebase.json`) — not `firestore.rules`.
+- **iOS-first.** Implement and verify in `DPMv4/app` first; other clients follow and never block it.
+- **Seams cross every client.** Changing a Firestore field, callable, trigger, rule or index changes all clients at once; a field change goes through the `add-shared-field` skill. v4 seams update `DPMv4/docs/CONTRACT.md` in the same commit (`DPMv4/AGENTS.md` says what moves with it); legacy seams update `docs/CONTRACT.md`.
+- **Function changes are deploys.** v4 deploys from `DPMv4/` and never touches `(default)` or the old functions. Callables stay in **`us-central1`** on both backends.
 - **Admin SDK in functions bypasses rules.** Be deliberate about writes.
-- **Secrets:** keep secret files machine-local and gitignored. Provision them explicitly with `./op-sync.sh`; agents do not access password-manager tooling by default.
+- **Secrets:** keep secret files machine-local and gitignored. Provision them explicitly with `./op-sync.sh` (fills `DPMv4/app` and `DopaminingSwift`); agents do not access password-manager tooling by default.
 - **Editor:** always use `vim`, never `nano`. When a command needs an editor, set it inline: `EDITOR=vim VISUAL=vim <cmd>` (e.g. `EDITOR=vim git commit`, `EDITOR=vim crontab -e`).
 
 ## Deeper context (read on demand)
 
-- `DopaminingSwift/AGENTS.md` — iOS specifics (build, patterns, conventions)
-- **iOS publishing:** `DopaminingSwift/fastlane/WORKFLOW.md` — read before `fstln beta`, `fstln release`, changing version/build counters, or recovering an upload/submission.
-- `DPM_cloud_functions/AGENTS.md` — backend specifics (deploy, callables, Stripe)
-- `docs/CONTRACT.md` — **the cross-platform contract, keyed by seam**: shared Firestore fields, callables, triggers, rules, and where each lives across iOS/web/functions/Android. Read this before changing any shared field, function signature, or rule. Includes known divergences + drift flags. **Upkeep obligation:** after changing any seam (field, callable, trigger, rule, index), update the affected CONTRACT.md table in the same piece of work and push it (`docs/` is its own repo). To reconcile wholesale, run the `audit-contract` skill.
-- `docs/economy-simulator.html` — interactive DPM economy simulator
+- **iOS publishing:** `DPMv4/app/fastlane/WORKFLOW.md` — read before `fstln beta`, `fstln release`, changing version/build counters, or recovering an upload/submission. The legacy 2.2.x train uses `DopaminingSwift/fastlane/WORKFLOW.md`; both upload to the same App Store record.
+- Legacy fixes: `DopaminingSwift/AGENTS.md` (iOS), `DPM_cloud_functions/AGENTS.md` (old backend, Stripe, economy flags).
+- `docs/year-economy-simulator.html` — interactive year-game economy simulator.
 
 ## Agent skills
 

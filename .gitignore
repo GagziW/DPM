@@ -1,6 +1,6 @@
 # DPM workspace repo — tracks ONLY the cross-repo orchestration files
 # (agent instructions, Claude config, skills, hooks, Firebase deploy config).
-# The product repos (DopaminingSwift, DPM_cloud_functions, DPM.org, DPMAndroid,
+# The product repos (DPMv4, DopaminingSwift, DPM_cloud_functions, DPM.org, DPMAndroid,
 # DPM_admin_board, docs) are independent git repos cloned by ./setup.sh.
 
 # Ignore everything at the top level by default…

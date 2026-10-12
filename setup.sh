@@ -12,6 +12,7 @@ clone() {
   fi
 }
 
+clone git@github.com:GagziW/DpmSwift.git            DPMv4   # v4: all new work
 clone git@github.com:GagziW/DopaminingSwift.git     DopaminingSwift
 clone git@github.com:GagziW/DPM_cloud_functions.git DPM_cloud_functions
 clone git@github.com:GagziW/DPM.org.git             DPM.org
@@ -26,5 +27,5 @@ echo "  2. ./sync-agent-skills.sh   (shared Codex + Claude skills; safe to rerun
 echo "  3. firebase login   (project: dopaminingswift)"
 echo "  4. Open Codex or Claude Code from this directory — both pick up AGENTS.md,"
 echo "     .claude/ (skills, agents, hooks, settings) and .mcp.json automatically."
-echo "  5. Read docs/CONTRACT.md before touching any shared Firestore field,"
-echo "     callable, or security rule."
+echo "  5. Read DPMv4/AGENTS.md and DPMv4/docs/PLAN.md first; DPMv4/docs/CONTRACT.md"
+echo "     before touching any shared Firestore field, callable, or security rule."

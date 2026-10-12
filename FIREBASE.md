@@ -1,5 +1,9 @@
 # Firebase layout (DPM)
 
+> **Legacy deploy config.** This page covers the old backend: `(default)` database + `DPM_cloud_functions/`.
+> The v4 backend deploys from `DPMv4/firebase.json` (Functions codebase `dpm-v4`, database `dpm-v4`); see
+> `DPMv4/README.md`. Neither deploy touches the other.
+
 Project: **`dopaminingswift`**. One canonical config at the repo root; everything else is
 emulator/test-only. After the June 2026 consolidation there are no duplicate deploy configs.
 
