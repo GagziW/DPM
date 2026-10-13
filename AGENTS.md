@@ -12,16 +12,21 @@ iOS-first monorepo. All clients share one Firebase project (`dopaminingswift`) a
 - `DPMv4/ios/DPMv4Client/` — the Swift data layer the app links (models, policy mirrors, callables).
 - `DPMv4/docs/` — `PLAN` (design, cutover), `CONTRACT` (the seams), `DECISIONS`, `MIGRATION`; `DPMv4/fixtures/` pins the numbers Swift and TypeScript share.
 
+Satellites on `dpm-v4` (PLAN §8.1), each its own repo:
+
+- **`DPM.org/`** — the website (Next.js + Stripe): landing, `/join/<code>` bridge, subscription (`billing`), `/profile`, `/dashboard`. Read-only on Firestore; work on `staging` (push = staging deploy), production is `main`. `DPM.org/AGENTS.md`.
+- **`DPM_admin_board/`** — the ops board: support actions as v4 ops jobs (`config/jobs/runs`). Its `admin-cli/` and old `scripts/` are retired legacy. `DPM_admin_board/AGENTS.md`.
+
 What the player is doing right now: `users/{uid}.challenge` (embedded) plus one `users/{uid}/days/{yyyy-MM-dd}` record per day, in database `dpm-v4`.
 
 ## Legacy — keep it running, fix only
 
-Everything outside `DPMv4/` is deprecated. It serves the live 2.2.x App Store app and the `(default)` database until the v4 cutover (`DPMv4/docs/PLAN.md` §8), then retires. Keep it working so a production break can still be fixed there; build nothing new on it.
+Everything outside `DPMv4/` and the two satellites above is deprecated. It serves the live 2.2.x App Store app and the `(default)` database until the v4 cutover (`DPMv4/docs/PLAN.md` §8), then retires. Keep it working so a production break can still be fixed there; build nothing new on it.
 
 - **`DopaminingSwift/`** — the 2.2.x App Store app. Bug fixes only, and every fix also lands in `DPMv4/app/`.
 - **`DPM_cloud_functions/`** — the old backend (≈80 functions on `(default)`). Bug fixes only. Deploys from the root `firebase.json`; its rules file is `firebase/firestore_security_rules.rules` (`FIREBASE.md`).
 - **`docs/CONTRACT.md`** — the old contract: `users/{uid}.activeChallenge → challenges/{id}` on `(default)`. A legacy seam fix updates it in the same piece of work and pushes it (`docs/` is its own repo); `audit-contract` reconciles it wholesale.
-- **`DPM.org/`** (Next.js + Stripe), **`DPM_admin_board/`** (ops web app + `admin-cli/`), **`DPMAndroid/`** (Kotlin, parked) — still on `(default)`. PLAN §8.1 narrows the website and repoints it and the admin board at `dpm-v4`; Android stays parked.
+- **`DPMAndroid/`** (Kotlin, parked) — still on `(default)`; stays parked (PLAN §8.1).
 - `DopaminingSwift-main/`, `DPMdocs/` — second clones of old branches; edit the real checkouts above.
 
 ## Working rules
