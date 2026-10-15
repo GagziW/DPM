@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Safely fast-forward every Git repository in the DPM workspace.
+#
+# Local changes stay in place. When an incoming commit also changes a file you
+# changed, the script stashes your changes around the fast-forward, but only after
+# it has checked that they apply again without conflicts.
 set -u
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,13 +36,6 @@ for repository in "${REPOSITORIES[@]}"; do
     continue
   fi
 
-  if [[ -n "$(git -C "${path}" status --porcelain)" ]]; then
-    echo "SKIP: working tree has local changes"
-    git -C "${path}" status --short
-    ((skipped += 1))
-    continue
-  fi
-
   branch="$(git -C "${path}" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   if [[ -z "${branch}" ]]; then
     echo "SKIP: HEAD is detached"
@@ -53,27 +50,72 @@ for repository in "${REPOSITORIES[@]}"; do
     continue
   fi
 
-  before="$(git -C "${path}" rev-parse HEAD)"
-  if ! git -C "${path}" pull --ff-only; then
-    echo "FAIL: could not fast-forward ${branch} from ${upstream}" >&2
-    counts="$(git -C "${path}" rev-list --left-right --count "HEAD...${upstream}" 2>/dev/null || true)"
-    if [[ -n "${counts}" ]]; then
-      read -r ahead behind <<<"${counts}"
-      if ((ahead > 0 && behind > 0)); then
-        echo "      ${branch} has ${ahead} local commit(s) not on ${upstream} and is ${behind} behind." >&2
-        echo "      Replay them on top and publish: git -C \"${path}\" pull --rebase && git -C \"${path}\" push" >&2
-      fi
-    fi
+  if ! git -C "${path}" fetch --quiet; then
+    echo "FAIL: could not fetch ${upstream}" >&2
     ((failed += 1))
     continue
   fi
 
-  after="$(git -C "${path}" rev-parse HEAD)"
-  if [[ "${before}" == "${after}" ]]; then
-    ((current += 1))
-  else
-    ((updated += 1))
+  if ! counts="$(git -C "${path}" rev-list --left-right --count "HEAD...${upstream}" 2>/dev/null)"; then
+    echo "FAIL: could not compare ${branch} with ${upstream}" >&2
+    ((failed += 1))
+    continue
   fi
+  read -r ahead behind <<<"${counts}"
+  changed="$(git -C "${path}" status --porcelain | wc -l | tr -d ' ')"
+  ((changed > 0)) && echo "Keeping ${changed} local change(s)."
+
+  if ((behind == 0)); then
+    echo "${branch} is up to date with ${upstream}."
+    ((ahead > 0)) && echo "${branch} has ${ahead} commit(s) not pushed to ${upstream}."
+    ((current += 1))
+    continue
+  fi
+
+  if ((ahead > 0)); then
+    echo "FAIL: ${branch} has ${ahead} local commit(s) not on ${upstream} and is ${behind} behind." >&2
+    echo "      Replay them on top and publish: git -C \"${path}\" pull --rebase --autostash && git -C \"${path}\" push" >&2
+    ((failed += 1))
+    continue
+  fi
+
+  # Files that you changed and that the incoming commits also change.
+  overlap="$(comm -12 \
+    <(git -C "${path}" diff --name-only HEAD "${upstream}" | sort) \
+    <(git -C "${path}" diff --name-only HEAD | sort))"
+
+  merge_args=(--ff-only)
+  if [[ -n "${overlap}" ]]; then
+    # Merge a snapshot of the working tree with the incoming commits in memory.
+    # This does not touch the working tree, the index or the stash list.
+    snapshot="$(git -C "${path}" stash create)"
+    if ! conflicts="$(git -C "${path}" merge-tree --write-tree --name-only --no-messages \
+      --merge-base=HEAD "${snapshot}" "${upstream}")"; then
+      echo "FAIL: the incoming commits conflict with your changes in:" >&2
+      tail -n +2 <<<"${conflicts}" | sed 's/^/      /' >&2
+      echo "      Commit or stash these changes, then run the script again." >&2
+      ((failed += 1))
+      continue
+    fi
+    merge_args+=(--autostash)
+  fi
+
+  if ! git -C "${path}" merge "${merge_args[@]}" "${upstream}"; then
+    echo "FAIL: could not fast-forward ${branch} from ${upstream}" >&2
+    ((failed += 1))
+    continue
+  fi
+
+  unmerged="$(git -C "${path}" diff --name-only --diff-filter=U)"
+  if [[ -n "${unmerged}" ]]; then
+    echo "FAIL: your changes did not apply cleanly after the fast-forward. They are safe in the stash." >&2
+    echo "${unmerged}" | sed 's/^/      /' >&2
+    echo "      Fix the conflict markers in these files, then run: git -C \"${path}\" stash drop" >&2
+    ((failed += 1))
+    continue
+  fi
+
+  ((updated += 1))
 done
 
 printf '\nSync complete: %d updated, %d already current, %d skipped, %d failed.\n' \
