@@ -19,29 +19,31 @@ Satellites on `dpm-v4` (PLAN §8.1), each its own repo:
 
 What the player is doing right now: `users/{uid}.challenge` (embedded) plus one `users/{uid}/days/{yyyy-MM-dd}` record per day, in database `dpm-v4`.
 
-## Legacy — keep it running, fix only
+## Legacy — retired archive
 
-Everything outside `DPMv4/` and the two satellites above is deprecated. It serves the live 2.2.x App Store app and the `(default)` database until the v4 cutover (`DPMv4/docs/PLAN.md` §8), then retires. Keep it working so a production break can still be fixed there; build nothing new on it.
+All users are on v4. Legacy functions and client database access were retired on 2026-10-26.
+Keep archived source and data for support; implement production fixes in `DPMv4/`.
+Retirement evidence, backup and retention: `DPMv4/docs/MIGRATION.md` §6.
 
-- **`DopaminingSwift/`** — the 2.2.x App Store app. Bug fixes only, and every fix also lands in `DPMv4/app/`.
-- **`DPM_cloud_functions/`** — the old backend (≈80 functions on `(default)`). Bug fixes only. Deploys from the root `firebase.json`; its rules file is `firebase/firestore_security_rules.rules` (`FIREBASE.md`).
-- **`docs/CONTRACT.md`** — the old contract: `users/{uid}.activeChallenge → challenges/{id}` on `(default)`. A legacy seam fix updates it in the same piece of work and pushes it (`docs/` is its own repo); `audit-contract` reconciles it wholesale.
-- **`DPMAndroid/`** (Kotlin, parked) — still on `(default)`; stays parked (PLAN §8.1).
-- `DopaminingSwift-main/`, `DPMdocs/` — second clones of old branches; edit the real checkouts above.
+- **`DopaminingSwift/`** — archived 2.2.x app; current iOS work belongs in `DPMv4/app/`.
+- **`DPM_cloud_functions/`** — retired backend source. Its deploy script is disabled. Root `firebase.json` only maintains the `(default)` client access freeze; current deploys use `DPMv4/firebase.json` (`FIREBASE.md`).
+- **`docs/CONTRACT.md`** — historical `(default)` contract, with the current access freeze documented.
+- **`DPMAndroid/`** — parked legacy client; current Android work belongs in `DPMv4/android/`.
+- `DopaminingSwift-main/`, `DPMdocs/` — second clones of old branches; use the real checkouts above for historical reference.
 
 ## Working rules
 
 - **iOS-first.** Implement and verify in `DPMv4/app` first; other clients follow and never block it.
-- **Seams cross every client.** Changing a Firestore field, callable, trigger, rule or index changes all clients at once; a field change goes through the `add-shared-field` skill. v4 seams update `DPMv4/docs/CONTRACT.md` in the same commit (`DPMv4/AGENTS.md` says what moves with it); legacy seams update `docs/CONTRACT.md`.
-- **Function changes are deploys.** v4 deploys from `DPMv4/` and never touches `(default)` or the old functions. Callables stay in **`us-central1`** on both backends.
+- **Seams cross every client.** Changing a Firestore field, callable, trigger, rule or index changes all clients at once; a field change goes through the `add-shared-field` skill. v4 seams update `DPMv4/docs/CONTRACT.md` in the same commit (`DPMv4/AGENTS.md` says what moves with it).
+- **Function changes are deploys.** v4 deploys from `DPMv4/` and never touches `(default)` or the old functions. Callables stay in **`us-central1`**.
 - **Admin SDK in functions bypasses rules.** Be deliberate about writes.
 - **Secrets:** keep secret files machine-local and gitignored. Provision them explicitly with `./op-sync.sh` (fills `DPMv4/app` and `DopaminingSwift`); agents do not access password-manager tooling by default.
 - **Editor:** always use `vim`, never `nano`. When a command needs an editor, set it inline: `EDITOR=vim VISUAL=vim <cmd>` (e.g. `EDITOR=vim git commit`, `EDITOR=vim crontab -e`).
 
 ## Deeper context (read on demand)
 
-- **iOS publishing:** `DPMv4/app/fastlane/WORKFLOW.md` — read before `fstln beta`, `fstln release`, changing version/build counters, or recovering an upload/submission. The legacy 2.2.x train uses `DopaminingSwift/fastlane/WORKFLOW.md`; both upload to the same App Store record.
-- Legacy fixes: `DopaminingSwift/AGENTS.md` (iOS), `DPM_cloud_functions/AGENTS.md` (old backend, Stripe, economy flags).
+- **iOS publishing:** `DPMv4/app/fastlane/WORKFLOW.md` — read before `fstln beta`, `fstln release`, changing version/build counters, or recovering an upload/submission. The archived 2.2.x workflow shares the same App Store record; use the v4 publishing workflow.
+- Historical source: `DopaminingSwift/AGENTS.md` (iOS), `DPM_cloud_functions/AGENTS.md` (old backend, Stripe, economy flags).
 - `docs/year-economy-simulator.html` — interactive year-game economy simulator.
 
 ## Agent skills

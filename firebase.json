@@ -1,12 +1,6 @@
 {
   "firestore": {
-    "rules": "firebase/firestore_security_rules.rules",
-    "indexes": "firebase/firestore.indexes.json"
-  },
-  "functions": {
-    "source": "DPM_cloud_functions",
-    "predeploy": [
-      "npm --prefix DPM_cloud_functions run build"
-    ]
+    "database": "(default)",
+    "rules": "DPMv4/firebase/legacy.readonly.rules"
   }
 }

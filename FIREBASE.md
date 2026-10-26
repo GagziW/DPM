@@ -1,61 +1,24 @@
 # Firebase layout (DPM)
 
-> **Legacy deploy config.** This page covers the old backend: `(default)` database + `DPM_cloud_functions/`.
-> The v4 backend deploys from `DPMv4/firebase.json` (Functions codebase `dpm-v4`, database `dpm-v4`); see
-> `DPMv4/README.md`. Neither deploy touches the other.
+Project: **`dopaminingswift`**. Production uses the v4 backend and database.
 
-Project: **`dopaminingswift`**. One canonical config at the repo root; everything else is
-emulator/test-only. After the June 2026 consolidation there are no duplicate deploy configs.
-
-## What gets deployed (the canonical set)
-
-| Concern | File | Notes |
+| Purpose | Deploy config | Scope |
 |---|---|---|
-| Deploy config | `firebase.json` (repo root) | the only deploy config |
-| Project alias | `.firebaserc` (repo root) | `default → dopaminingswift` |
-| Security rules | `firebase/firestore_security_rules.rules` | the ONLY deployed ruleset |
-| Indexes | `firebase/firestore.indexes.json` | 29 indexes (union, reconciled) |
-| Functions | `DPM_cloud_functions/` | `firebase.json` → `functions.source` |
+| Production | `DPMv4/firebase.json` | Functions codebase `dpm-v4`; rules and indexes for database `dpm-v4` |
+| Legacy access freeze | root `firebase.json` | Only `(default)` rules from `DPMv4/firebase/legacy.readonly.rules` |
 
-**Deploy from the repo root:**
+For production changes, read `DPMv4/README.md` and deploy from `DPMv4/`.
+The root config has no functions or index deployment. `DPM_cloud_functions` is archived and its
+`npm run deploy` exits with a retirement notice.
 
-```
-firebase deploy                       # rules + indexes + functions
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
-firebase deploy --only functions       # or: npm --prefix DPM_cloud_functions run deploy
-```
+Legacy client access permits only public document get of `appConfig/features` so old builds can
+show the update gate. All other client reads and writes are denied. Admin SDK support access remains.
+The historical `firebase/firestore_security_rules.rules` and indexes are retained as reference.
 
-`DPM_cloud_functions`'s own `deploy`/`serve` scripts point back at the root config via
-`--config ../firebase.json --project dopaminingswift`, so they stay in sync.
+Retirement evidence, the export location and retention requirements are in
+`DPMv4/docs/MIGRATION.md` §6. Preserve the default database and export until that retention window
+ends; cleanup requires a second export and an explicit data-deletion task.
 
-## NOT deployed — emulator / test only
-
-- `DopaminingSwift/firebase.emulator.json` — iOS emulator stack (open rules for tests). Its `indexes`
-  now points at the canonical `../firebase/firestore.indexes.json` (no separate copy).
-- `DopaminingSwift/firestore.emulator.rules` — OPEN rules, "NEVER DEPLOY".
-- `DopaminingSwift/rules-tests/` — Firestore rules unit tests (`dummy.rules` + its own `firebase.json`).
-
-## Admin / ops
-
-- `DPM_admin_board/` — admin web app **and** `admin-cli/` (Admin-SDK scripts, formerly the
-  separate `firebase-admin` repo). One repo, one `.env.local`, one credential
-  (`op://DPM/FirebaseAdmin/ServiceAccountJson`). Run scripts with the env injected, e.g.
-  `op run --env-file=.env.local.tpl -- npm run admin`.
-
-## Removed in consolidation
-
-- `firebase/firebase.json` + `firebase/.firebaserc` — duplicate deploy config (root is canonical).
-- `DopaminingSwift/firebase.json` — stale (pointed at old `../cloud-functions` + a missing
-  `firestore.rules`; carried an orphaned hosting block whose `public` dir didn't exist).
-- `DopaminingSwift/firestore.indexes.json` — duplicate that had drifted from prod.
-- `firebase-admin/` repo — merged into `DPM_admin_board/admin-cli/`.
-
-## ⚠ Action needed
-
-- **Deploy the reconciled indexes:** 10 composite indexes the app uses were missing from prod
-  (`challenges`, `archivedChallenges`, `competitions`, `challengeGroups`, `liveActivities`).
-  Run `firebase deploy --only firestore:indexes` and let them build.
-- **Commit per-repo before re-cloning/renaming.** Uncommitted working-tree edits are lost when a
-  repo is re-cloned (this happened to the website→`DPM.org` rename). Commit code + `.tpl` files in
-  each product repo, and ensure each repo's `.gitignore` keeps `!.env.local.tpl` so templates persist.
+The website is `DPM.org/` (App Hosting; `staging` and `main` production).
+The ops board is `DPM_admin_board/`; current support actions use v4 ops jobs. Its old admin CLI
+and scripts are retired. Emulator configs in archived clients remain test-only.
